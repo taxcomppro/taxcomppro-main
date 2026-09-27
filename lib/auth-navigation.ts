@@ -35,6 +35,10 @@ export function accountUrl(path: string, next: string): string {
 
 // One cookie name/prefix (Better Auth default) and scope across every web app.
 export const sharedCookieOptions = {
+  crossSubDomainCookies: {
+    enabled: process.env.NODE_ENV === "production",
+    domain: process.env.NODE_ENV === "production" ? ".taxcomppro.com" : undefined,
+  },
   crossSubdomainCookies: {
     enabled: process.env.NODE_ENV === "production",
     domain: process.env.NODE_ENV === "production" ? ".taxcomppro.com" : undefined,

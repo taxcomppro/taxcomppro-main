@@ -29,7 +29,11 @@ import {
   PhoneOff01Icon,
   Radio01Icon,
   Message01Icon,
+  ShoppingBag01Icon,
+  Tag01Icon,
 } from "hugeicons-react";
+import ProTalkProductSpotlight from "./ProTalkProductSpotlight";
+import ProTalkTagProductModal from "./ProTalkTagProductModal";
 import {
   Clock,
   Loader2,
@@ -627,6 +631,7 @@ function ReportModal({
           </div>
         )}
       </div>
+
     </div>
   );
 }
@@ -817,6 +822,23 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
   const [visibility, setVisibility] = useState(space.visibility || "PUBLIC");
   const [visibilityPending, setVisibilityPending] = useState(false);
 
+  // ── Tagged Marketplace Product Spotlight State ──
+  const [taggedProduct, setTaggedProduct] = useState<any | null>(null);
+  const [showTagProductModal, setShowTagProductModal] = useState(false);
+  const taggedProductRef = useRef<any | null>(null);
+  taggedProductRef.current = taggedProduct;
+
+  useEffect(() => {
+    fetch(`/api/spaces/${space.id}/tagged-product`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.taggedProduct) {
+          setTaggedProduct(data.taggedProduct);
+        }
+      })
+      .catch(() => {});
+  }, [space.id]);
+
   const discussionEndRef = useRef<HTMLDivElement>(null);
 
   const isHost =
@@ -906,6 +928,7 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
       reactionsEnabled,
       discussionEnabled,
       visibility,
+      taggedProduct: taggedProductRef.current,
     });
   }, [safePublishData, reactionsEnabled, discussionEnabled, raised, visibility]);
 
@@ -1172,6 +1195,8 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
             "mute_user_discussion",
             "poll_create",
             "poll_close",
+            "tag_product",
+            "untag_product",
           ].includes(msgType) &&
           !manager
         )
@@ -1225,6 +1250,12 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
           });
         } else if (msgType === "poll_close") {
           setActivePoll((prev) => (prev ? { ...prev, isActive: false } : null));
+        } else if (msgType === "tag_product") {
+          setTaggedProduct(raw.product as any);
+          showToast(`🔥 Host spotlighted: "${(raw.product as any)?.title || "Featured Product"}"`);
+        } else if (msgType === "untag_product") {
+          setTaggedProduct(null);
+          showToast("Product spotlight removed.");
         } else if (msgType === "remote_mute") {
           if (localParticipant?.identity === raw.targetIdentity) {
             localParticipant.setMicrophoneEnabled(false);
@@ -1264,6 +1295,9 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
             setReactionsEnabled(raw.reactionsEnabled);
           if (typeof raw.discussionEnabled === "boolean")
             setDiscussionEnabled(raw.discussionEnabled);
+          if (raw.taggedProduct !== undefined) {
+            setTaggedProduct(raw.taggedProduct as any);
+          }
 
           if (raw.promoted)
             setRaised((previous) => {
@@ -1961,6 +1995,25 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
               )}
             </button>
 
+            {/* Tag / Spotlight Product Button (Host & Co-hosts) */}
+            {isAuthorizedManager && (
+              <button
+                onClick={() => setShowTagProductModal(true)}
+                aria-label="Tag Product Live"
+                className={`relative flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  taggedProduct
+                    ? "bg-amber-500/25 border border-amber-400 text-amber-300 shadow-lg shadow-amber-500/20"
+                    : "bg-white/10 hover:bg-white/15 text-white"
+                }`}
+              >
+                <ShoppingBag01Icon className="w-4 h-4 text-amber-400" />
+                <span>{taggedProduct ? "Product Active" : "Tag Product"}</span>
+                {taggedProduct && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                )}
+              </button>
+            )}
+
             {/* Leave Room Button */}
             <button
               onClick={() => router.push("/pro-talks")}
@@ -2370,6 +2423,40 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
           </div>
         )}
       </div>
+
+      {/* ── Live Product Spotlight Card (Visible to all attendees & host) ── */}
+      <ProTalkProductSpotlight
+        spaceId={space.id}
+        taggedProduct={taggedProduct}
+        isHost={isAuthorizedManager}
+        currentUser={{ id: userId }}
+        onOpenTagModal={() => setShowTagProductModal(true)}
+        onUntag={() => {
+          setTaggedProduct(null);
+          safePublishData({ type: "untag_product" });
+          fetch(`/api/spaces/${space.id}/tagged-product`, { method: "DELETE" }).catch(() => {});
+        }}
+      />
+
+      {/* ── Host Tag & Spotlight Product Modal ── */}
+      {showTagProductModal && (
+        <ProTalkTagProductModal
+          spaceId={space.id}
+          isOpen={showTagProductModal}
+          onClose={() => setShowTagProductModal(false)}
+          currentTaggedProduct={taggedProduct}
+          onProductTagged={(product) => {
+            setTaggedProduct(product);
+            safePublishData({ type: "tag_product", product });
+            showToast(`✨ Spotlighted "${product.title}" live to all attendees!`);
+          }}
+          onProductUntagged={() => {
+            setTaggedProduct(null);
+            safePublishData({ type: "untag_product" });
+            showToast("Product spotlight removed.");
+          }}
+        />
+      )}
     </div>
   );
 }

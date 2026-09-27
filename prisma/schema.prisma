@@ -292,6 +292,7 @@ model MarketplaceListing {
   coupons          MarketplaceCoupon[]
   referrals        MarketplaceReferral[]
   networkProducts  ProNetworkProduct[]
+  taggedInSpaces   Space[]             @relation("SpaceTaggedListing")
 
   @@map("marketplace_listings")
 }
@@ -810,13 +811,15 @@ model Space {
   isReplay              Boolean   @default(false)
   coHostIds             String[]  @default([])
   visibility            String    @default("PUBLIC")
+  taggedListingId       String?
   createdAt             DateTime  @default(now())
   endedAt               DateTime?
 
-  host        User              @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  rsvps       SpaceRsvp[]
-  reports     SpaceReport[]
-  attendances SpaceAttendance[]
+  host          User                @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  taggedListing MarketplaceListing? @relation("SpaceTaggedListing", fields: [taggedListingId], references: [id], onDelete: SetNull)
+  rsvps         SpaceRsvp[]
+  reports       SpaceReport[]
+  attendances   SpaceAttendance[]
 
   @@map("spaces")
 }
