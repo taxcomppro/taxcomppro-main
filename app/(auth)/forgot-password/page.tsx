@@ -188,20 +188,20 @@ export default function ForgotPasswordPage() {
           <Link href="/">
             <Image
               src="/logo.webp"
-              alt="TaxCompPro"
-              width={160}
-              height={60}
+              alt="Tax Compliance Pro"
+              width={220}
+              height={65}
               className="object-contain dark:hidden"
-              style={{ width: "auto", height: "auto" }}
+              style={{ width: "220px", height: "auto", maxHeight: "65px" }}
               loading="eager"
             />
             <Image
               src="/logo_dark.webp"
-              alt="TaxCompPro"
-              width={160}
-              height={60}
+              alt="Tax Compliance Pro"
+              width={220}
+              height={65}
               className="object-contain hidden dark:block"
-              style={{ width: "auto", height: "auto" }}
+              style={{ width: "220px", height: "auto", maxHeight: "65px" }}
               loading="eager"
             />
           </Link>

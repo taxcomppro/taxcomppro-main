@@ -307,7 +307,7 @@ function ScheduledScreen({
         )}
         {currentUserId && !isHost && (
           <button id="detail-rsvp-btn" onClick={toggleRsvp} disabled={rsvping} className={`ptr-btn ${rsvped ? "ptr-btn--ghost" : "ptr-btn--primary"}`}>
-            {rsvping ? <Loader2 className="w-4 h-4 animate-spin" /> : rsvped ? <><CheckCheck className="w-4 h-4" /> Reminder set</> : <><Check className="w-4 h-4" /> Remind me</>}
+            {rsvping ? <Loader2 className="w-4 h-4 animate-spin" /> : rsvped ? <><CheckCheck className="w-4 h-4" /> RSVP&apos;d</> : <><Check className="w-4 h-4" /> RSVP</>}
           </button>
         )}
         {!currentUserId && (

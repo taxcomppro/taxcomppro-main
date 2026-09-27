@@ -21,6 +21,7 @@ import "@/components/networks/network-posts.css";
 import MemberBubbleCloud from "@/components/networks/MemberBubbleCloud";
 import NetworkAnalytics from "@/components/networks/NetworkAnalytics";
 import NetworkModeration from "@/components/networks/NetworkModeration";
+import NetworkShop from "@/components/networks/NetworkShop";
 import { Trash2 } from "lucide-react";
 import {
   Home01Icon as Home,
@@ -71,6 +72,7 @@ import {
   Mic01Icon as Mic,
   AlertCircleIcon as AlertCircle,
   StarIcon as Star,
+  ShoppingBag01Icon as ShoppingBag,
 } from "hugeicons-react";
 
 interface ProNetworkDetails {
@@ -386,6 +388,7 @@ export default function ProNetworkHubPage({
     | "events"
     | "members"
     | "chat"
+    | "shop"
     | "manage"
     | "analytics"
     | "moderation"
@@ -602,6 +605,8 @@ export default function ProNetworkHubPage({
         setActiveTab("analytics");
       } else if (params.get("tab") === "moderation") {
         setActiveTab("moderation");
+      } else if (params.get("tab") === "shop" || params.get("purchased") === "true") {
+        setActiveTab("shop");
       }
       if (params.get("stripe") === "success" || params.get("stripe") === "refresh") {
         setActiveTab("manage");
@@ -1271,6 +1276,7 @@ export default function ProNetworkHubPage({
               { id: "events", label: "Events", icon: Calendar },
               { id: "members", label: "Members", icon: Users },
               { id: "chat", label: "Members Chat", icon: MessagesSquare },
+              { id: "shop", label: "Shop", icon: ShoppingBag },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -1523,6 +1529,7 @@ export default function ProNetworkHubPage({
               { id: "events", label: "Events", icon: Calendar },
               { id: "members", label: "Members", icon: Users },
               { id: "chat", label: "Members Chat", icon: MessagesSquare },
+              { id: "shop", label: "Shop", icon: ShoppingBag },
               ...(canManage
                 ? [
                     { id: "analytics", label: "Analytics", icon: BarChart2 },
@@ -2883,6 +2890,15 @@ export default function ProNetworkHubPage({
                   )
                 );
               }}
+            />
+          )}
+
+          {/* ═════════ TAB 11: SHOP STOREFRONT ═════════ */}
+          {currentTab === "shop" && (
+            <NetworkShop
+              slug={slug}
+              network={network}
+              currentUser={currentUser}
             />
           )}
         </div>

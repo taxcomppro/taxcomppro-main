@@ -1,6 +1,6 @@
 "use client";
 import { useAdminDialog } from "@/components/layout/useAdminDialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   SparklesIcon,
@@ -8,16 +8,26 @@ import {
   PauseIcon,
   Settings01Icon,
   ArrowUpRight01Icon,
+  Delete02Icon,
+  Add01Icon,
+  CheckmarkCircle01Icon,
+  SentIcon,
+  RefreshIcon,
+  Search01Icon,
 } from "hugeicons-react";
-type Knowledge = {
+
+export type Knowledge = {
+  id?: string;
   title: string;
+  category?: string;
   text: string;
   url?: string;
   priority: number;
   approved: boolean;
   reviewedAt?: string;
 };
-type Bot = {
+
+export type Bot = {
   id: string;
   userId: string;
   user: { name: string; image: string; profileSlug: string };
@@ -29,16 +39,26 @@ type Bot = {
   courseNames: string[];
   personality: string;
   boundaries: string;
-  provider: string;
+  provider: "auto" | "openai" | "claude";
+  model: string;
+  temperature: number;
+  postTone: string;
+  postLength: string;
+  postDays: string[];
+  postTime: string;
+  timezone: string;
+  maxDailyReplies: number;
+  customPrompt?: string | null;
   enabled: boolean;
   autoPublish: boolean;
   autoReply: boolean;
   weeklyPosts: number;
-  destination: string;
+  destination: "FEED" | "GROUP" | "FORUM" | "NETWORK";
   destinationId: string | null;
   knowledge: Knowledge[];
 };
-type Activity = {
+
+export type Activity = {
   id: string;
   specialistId: string;
   kind: string;
@@ -49,6 +69,7 @@ type Activity = {
   publishedUrl: string | null;
   createdAt: string;
 };
+
 type Option = { id: string; name: string };
 type Data = {
   bots: Bot[];
@@ -60,28 +81,93 @@ type Data = {
   networks: Option[];
   courses: { id: string; title: string; instructorId: string }[];
 };
+
+const PRESET_AVATARS = [
+  { name: "Atlas (Robot)", image: "/Atlas.jpg" },
+  { name: "Celeste Rowan", image: "/Celeste.jpg" },
+  { name: "Vega Bennett", image: "/Vega.jpg" },
+  { name: "Nova Grant", image: "/Nova.jpg" },
+  { name: "Lyra Vance", image: "/Lyra.jpg" },
+  { name: "Marcus Reed", image: "/Orion.jpg" },
+  { name: "Elara Quinn", image: "/elara.jpg" },
+];
+
+const DAYS_OF_WEEK = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
+const KNOWLEDGE_TEMPLATES = [
+  {
+    title: "IRS Form 8867 Paid Preparer Due Diligence",
+    category: "IRS Guidance",
+    priority: 2,
+    text: "Treas. Reg. § 1.6695-2 requires paid tax return preparers to exercise due diligence in determining eligibility for EITC, CTC/ACTC/ODC, AOTC, and Head of Household (HOH) filing status. Preparers must complete Form 8867, meet the knowledge requirement by asking probing questions when information appears inconsistent or incomplete, verify qualifying child residence and relationship, and retain all documentation for 3 years from the date filed.",
+  },
+  {
+    title: "IRC § 162 Trade or Business Expenses & Substantiation",
+    category: "Tax Code / Law",
+    priority: 1,
+    text: "Under IRC § 162(a), taxpayers may deduct all ordinary and necessary expenses paid or incurred during the taxable year in carrying on any trade or business. An expense is 'ordinary' if it is common and accepted in the field of business, and 'necessary' if it is helpful and appropriate. Under IRC § 274(d), strict substantiation (adequate records of amount, time, place, and business purpose) is required for travel, gifts, and listed property.",
+  },
+  {
+    title: "Schedule C Record Reconstruction & Cohan Rule Limits",
+    category: "Firm SOP",
+    priority: 4,
+    text: "When primary receipts are lost or unavailable, preparers can assist with systematic record reconstruction using bank statements, credit card records, supplier invoices, calendar logs, and third-party confirmations. Under the Cohan rule (Cohan v. Commissioner, 39 F.2d 540), reasonable estimates may be permitted for general business deductions, but Cohan does NOT apply to § 274(d) expenses (meals, travel, vehicles). Never manufacture invoices.",
+  },
+  {
+    title: "Treasury Department Circular 230 § 10.37 Written Advice",
+    category: "Tax Code / Law",
+    priority: 1,
+    text: "Circular 230 § 10.37 establishes requirements for written tax advice: the practitioner must base the advice on reasonable factual and legal assumptions, reasonably consider all relevant facts known or that should be known, exercise reasonable effort to identify relevant facts, not rely on unreasonable representations, and relate the applicable law to the actual facts.",
+  },
+];
+
 export default function SpecialistsAdmin() {
   const [data, setData] = useState<Data | null>(null);
   const [editing, setEditing] = useState<Bot | null>(null);
+  const [activeTab, setActiveTab] = useState<"profile" | "schedule" | "knowledge" | "engine" | "playground">("profile");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [draft, setDraft] = useState<Activity | null>(null);
+  
+  // Knowledge & Tag local helpers
+  const [newTag, setNewTag] = useState("");
+  const [newStarter, setNewStarter] = useState("");
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const [knowledgeCategoryFilter, setKnowledgeCategoryFilter] = useState("ALL");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Playground state
+  const [testQuestion, setTestQuestion] = useState("");
+  const [testLoading, setTestLoading] = useState(false);
+  const [testAnswer, setTestAnswer] = useState<{ text: string; provider?: string } | null>(null);
+
+  // Activity queue filter
+  const [activityBotFilter, setActivityBotFilter] = useState("ALL");
+  const [activityStatusFilter, setActivityStatusFilter] = useState("ALL");
+
   const closeDialog = useCallback(() => {
     setEditing(null);
     setDraft(null);
+    setTestAnswer(null);
+    setTestQuestion("");
   }, []);
+
   useAdminDialog(!!editing || !!draft, closeDialog);
+
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/specialists");
     if (!r.ok) throw new Error("Could not load specialists.");
     setData(await r.json());
   }, []);
+
   useEffect(() => {
     void load().catch((e) => setError(e.message));
   }, [load]);
+
   async function action(
-    action: string,
+    actionName: string,
     id?: string,
     extra: Record<string, unknown> = {},
   ) {
@@ -92,16 +178,22 @@ export default function SpecialistsAdmin() {
       const r = await fetch("/api/admin/specialists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, id, ...extra }),
+        body: JSON.stringify({ action: actionName, id, ...extra }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error);
       await load();
-      setNotice(
-        action === "draft"
-          ? "Draft generated. Review it below before publishing."
-          : "Changes saved.",
-      );
+      if (actionName === "draft") {
+        setNotice("Draft generated. Review it in the queue below.");
+      } else if (actionName === "postNow") {
+        setNotice("Specialist post generated and published live!");
+      } else if (actionName === "publish") {
+        setNotice("Post published successfully!");
+      } else if (actionName === "runSchedule") {
+        setNotice(`Schedule triggered. Results: ${JSON.stringify(d.results)}`);
+      } else {
+        setNotice("Changes saved.");
+      }
       setDraft(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed");
@@ -109,6 +201,7 @@ export default function SpecialistsAdmin() {
       setBusy(false);
     }
   }
+
   async function save() {
     if (!editing) return;
     setBusy(true);
@@ -127,33 +220,106 @@ export default function SpecialistsAdmin() {
       if (!r.ok) throw new Error(d.error);
       await load();
       setEditing(null);
-      setNotice("Specialist settings saved.");
+      setNotice(`Specialist settings for ${editing.user.name} saved successfully.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
       setBusy(false);
     }
   }
+
   const update = (patch: Partial<Bot>) =>
     setEditing((b) => (b ? { ...b, ...patch } : b));
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !editing) return;
+    setUploadingImage(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Image upload failed");
+      update({ user: { ...editing.user, image: d.url } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function runPlaygroundTest() {
+    if (!editing || !testQuestion.trim()) return;
+    setTestLoading(true);
+    setTestAnswer(null);
+    try {
+      const r = await fetch("/api/admin/specialists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "testPlayground",
+          id: editing.id,
+          question: testQuestion,
+          temporaryBot: {
+            ...editing,
+            name: editing.user.name,
+            image: editing.user.image || "",
+          },
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Playground test failed");
+      setTestAnswer(d.answer);
+    } catch (err) {
+      setTestAnswer({
+        text: `Error: ${err instanceof Error ? err.message : "Failed to run test"}`,
+        provider: "error",
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  }
+
   const destinations =
     editing?.destination === "GROUP"
       ? data?.groups
       : editing?.destination === "FORUM"
         ? data?.forums
         : data?.networks;
+
+  const filteredKnowledge = (editing?.knowledge || []).filter((k) => {
+    const matchesSearch =
+      !knowledgeSearch ||
+      k.title.toLowerCase().includes(knowledgeSearch.toLowerCase()) ||
+      k.text.toLowerCase().includes(knowledgeSearch.toLowerCase());
+    const matchesCat =
+      knowledgeCategoryFilter === "ALL" || k.category === knowledgeCategoryFilter;
+    return matchesSearch && matchesCat;
+  });
+
+  const filteredActivities = (data?.activities || []).filter((a) => {
+    if (a.kind === "CHAT") return false;
+    const matchesBot =
+      activityBotFilter === "ALL" || a.specialistId === activityBotFilter;
+    const matchesStatus =
+      activityStatusFilter === "ALL" || a.status === activityStatusFilter;
+    return matchesBot && matchesStatus;
+  });
+
   return (
     <div className="admin-workspace">
       <header className="admin-page-heading">
         <div>
           <span className="admin-eyebrow">INTELLIGENCE & COMMUNITY</span>
-          <h1>Your AI specialist team.</h1>
+          <h1>AI Specialist Control Center</h1>
           <p>
-            Seven distinct voices. One connected community. You stay in control.
+            Control posting schedules, feed custom tax knowledge, refine personas, and monitor live activities.
           </p>
         </div>
         <SparklesIcon size={38} />
       </header>
+
       {error && (
         <p role="alert" className="admin-alert">
           {error}
@@ -164,142 +330,201 @@ export default function SpecialistsAdmin() {
           {notice}
         </p>
       )}
+
       {!data ? (
-        <p>Loading specialists…</p>
+        <p>Loading AI specialists…</p>
       ) : (
         <>
+          {/* Top Metrics & Trigger Actions */}
           <div className="admin-metrics">
             <div>
-              <span>Specialists enabled</span>
-              <strong>{data.bots.filter((b) => b.enabled).length} / 7</strong>
+              <span>Specialists Active</span>
+              <strong>{data.bots.filter((b) => b.enabled).length} / {data.bots.length || 7}</strong>
             </div>
             <div>
-              <span>Configured providers</span>
+              <span>Configured Providers</span>
               <strong>
                 {[
                   data.providers.openai && "OpenAI",
                   data.providers.claude && "Claude",
                 ]
                   .filter(Boolean)
-                  .join(" + ") || "None configured"}
+                  .join(" + ") || "None"}
               </strong>
             </div>
             <div>
-              <span>Scheduled posts / week</span>
+              <span>Scheduled Posts / Wk</span>
               <strong>
                 {data.bots
                   .filter((b) => b.enabled)
-                  .reduce((n, b) => n + b.weeklyPosts, 0)}
+                  .reduce((n, b) => n + (b.postDays?.length || b.weeklyPosts || 0), 0)}
               </strong>
             </div>
             <div>
-              <span>Scheduler authorization</span>
+              <span>Scheduler System</span>
               <strong>
-                {data.schedulerConfigured
-                  ? "Configured"
-                  : "CRON_SECRET required"}
+                {data.schedulerConfigured ? "Active (14:00 UTC)" : "CRON_SECRET Needed"}
               </strong>
             </div>
           </div>
-          <p className="admin-hint">
-            Schedules run at 14:00 UTC on evenly spaced days. Auto-publish sends
-            generated posts to the selected destination; otherwise they remain
-            drafts. Replies are limited to name mentions and questions on a
-            specialist’s own feed threads. All content identifies its AI author.
-          </p>
-          {!data.bots.length && (
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "20px", flexWrap: "wrap" }}>
             <button
-              className="admin-primary"
               disabled={busy}
-              onClick={() => action("initialize")}
+              onClick={() => action("runSchedule")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                background: "var(--a-inner)",
+                border: "1px solid var(--a-line)",
+                padding: "8px 14px",
+                borderRadius: "10px",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
             >
-              Set up the seven specialists
+              <RefreshIcon size={15} /> Run Cron Schedule Now
             </button>
-          )}
-          <div className="admin-bot-grid">
-            {data.bots.map((b) => (
-              <article className="admin-bot-card" key={b.id}>
-                <div className="admin-bot-top">
-                  <img src={b.user.image} alt="" />
-                  <span
-                    className={
-                      b.enabled ? "admin-status" : "admin-status paused"
-                    }
-                  >
-                    {b.enabled ? (
-                      <PlayIcon size={12} />
-                    ) : (
-                      <PauseIcon size={12} />
-                    )}{" "}
-                    {b.enabled ? "Enabled" : "Paused"}
-                  </span>
-                </div>
-                <h2>{b.user.name}</h2>
-                <p>{b.title}</p>
-                <small>Tax Comp Pro AI Specialist</small>
-                <div className="admin-bot-tags">
-                  <span>{b.weeklyPosts} posts / week</span>
-                  <span>
-                    {b.autoPublish ? "Auto-publish" : "Review drafts"}
-                  </span>
-                  <span>{b.destination.toLowerCase()}</span>
-                </div>
-                <footer>
-                  <button onClick={() => setEditing(structuredClone(b))}>
-                    <Settings01Icon size={16} /> Manage
-                  </button>
-                  <button
-                    disabled={busy || !b.enabled}
-                    onClick={() => action("draft", b.id)}
-                  >
-                    Generate draft
-                  </button>
-                  <Link
-                    aria-label={`View ${b.user.name}`}
-                    href={`/member/${b.user.profileSlug}`}
-                  >
-                    <ArrowUpRight01Icon size={18} />
-                  </Link>
-                </footer>
-              </article>
-            ))}
+            {!data.bots.length && (
+              <button
+                className="admin-primary"
+                disabled={busy}
+                onClick={() => action("initialize")}
+              >
+                Set up 7 Default Specialists
+              </button>
+            )}
           </div>
-          <section className="admin-panel">
-            <h2>Activity & publishing queue</h2>
-            <p>Review drafts, inspect failures, and open published posts.</p>
+
+          {/* Specialists Grid */}
+          <div className="admin-bot-grid">
+            {data.bots.map((b) => {
+              const activeDays = b.postDays && b.postDays.length > 0
+                ? b.postDays.join(", ")
+                : `${b.weeklyPosts} posts / wk`;
+
+              return (
+                <article className="admin-bot-card" key={b.id}>
+                  <div className="admin-bot-top">
+                    <img src={b.user.image || "/Atlas.jpg"} alt={b.user.name} />
+                    <span className={b.enabled ? "admin-status" : "admin-status paused"}>
+                      {b.enabled ? <PlayIcon size={12} /> : <PauseIcon size={12} />}
+                      {b.enabled ? "Active" : "Paused"}
+                    </span>
+                  </div>
+
+                  <h2>{b.user.name}</h2>
+                  <p>{b.title}</p>
+                  <small>Tax Comp Pro AI Specialist</small>
+
+                  <div className="admin-bot-tags">
+                    <span>🗓️ {activeDays}</span>
+                    <span>⏰ {b.postTime || "14:00"} UTC</span>
+                    <span>📍 {b.destination.toLowerCase()}</span>
+                    <span>{b.autoPublish ? "⚡ Auto-publish" : "📝 Review drafts"}</span>
+                    <span>🧠 {Array.isArray(b.knowledge) ? b.knowledge.filter(k => k.approved).length : 0} sources</span>
+                    {b.model && b.model !== "auto" && <span>🤖 {b.model}</span>}
+                  </div>
+
+                  <footer>
+                    <button onClick={() => { setEditing(structuredClone(b)); setActiveTab("profile"); }}>
+                      <Settings01Icon size={16} /> Manage
+                    </button>
+                    <button
+                      disabled={busy || !b.enabled}
+                      onClick={() => action("draft", b.id)}
+                      title="Generate a draft for review"
+                    >
+                      Draft
+                    </button>
+                    <button
+                      disabled={busy || !b.enabled}
+                      onClick={() => action("postNow", b.id)}
+                      title="Generate and publish live immediately"
+                      style={{ color: "#ffbe24" }}
+                    >
+                      Post Now
+                    </button>
+                    <Link
+                      aria-label={`View ${b.user.name}`}
+                      href={`/member/${b.user.profileSlug}`}
+                    >
+                      <ArrowUpRight01Icon size={18} />
+                    </Link>
+                  </footer>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Activity & Publishing Queue Section */}
+          <section className="admin-panel" style={{ marginTop: "32px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "16px" }}>
+              <div>
+                <h2>Activity & Publishing Queue</h2>
+                <p>Review generated drafts, inspect AI responses, publish to community feeds, or discard.</p>
+              </div>
+
+              {/* Filters */}
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <select
+                  value={activityBotFilter}
+                  onChange={(e) => setActivityBotFilter(e.target.value)}
+                  style={{ padding: "6px 12px", borderRadius: "8px", background: "var(--a-inner)", border: "1px solid var(--a-line)", fontSize: "12px", color: "var(--a-text)" }}
+                >
+                  <option value="ALL">All Specialists</option>
+                  {data.bots.map((b) => (
+                    <option key={b.id} value={b.id}>{b.user.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={activityStatusFilter}
+                  onChange={(e) => setActivityStatusFilter(e.target.value)}
+                  style={{ padding: "6px 12px", borderRadius: "8px", background: "var(--a-inner)", border: "1px solid var(--a-line)", fontSize: "12px", color: "var(--a-text)" }}
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="DRAFT">Drafts (Pending Review)</option>
+                  <option value="PUBLISHED">Published</option>
+                  <option value="FAILED">Failed</option>
+                  <option value="DISCARDED">Discarded</option>
+                </select>
+              </div>
+            </div>
+
             <div className="admin-activity-list">
-              {data.activities
-                .filter((a) => a.kind !== "CHAT")
-                .map((a) => (
+              {filteredActivities.map((a) => {
+                const botMatch = data.bots.find((b) => b.id === a.specialistId);
+                return (
                   <article key={a.id}>
                     <div>
-                      <strong>
-                        {
-                          data.bots.find((b) => b.id === a.specialistId)?.user
-                            .name
-                        }
-                      </strong>
-                      <span className="admin-status">{a.status}</span>
+                      <strong>{botMatch?.user.name || a.specialistId}</strong>
+                      <span className={`admin-status ${a.status === "PUBLISHED" ? "" : a.status === "DRAFT" ? "paused" : ""}`}>
+                        {a.status}
+                      </span>
                       <small>
                         {new Date(a.createdAt).toLocaleString()} · {a.kind}{" "}
                         {a.provider && `· ${a.provider}`}
                       </small>
                     </div>
+
                     <p className="admin-activity-text">
-                      {a.error || a.content || "Generating content…"}
+                      {a.error ? `Error: ${a.error}` : a.content || "Generating content…"}
                     </p>
+
                     <div className="admin-actions">
                       {a.status === "DRAFT" && (
                         <>
                           <button disabled={busy} onClick={() => setDraft(a)}>
-                            Edit draft
+                            Edit Draft
                           </button>
                           <button
                             className="admin-primary"
                             disabled={busy}
                             onClick={() => action("publish", a.id)}
                           >
-                            Publish
+                            <SentIcon size={14} /> Publish Now
                           </button>
                         </>
                       )}
@@ -308,26 +533,30 @@ export default function SpecialistsAdmin() {
                           disabled={busy}
                           onClick={() => action("discard", a.id)}
                         >
-                          Discard
+                          <Delete02Icon size={14} /> Discard
                         </button>
                       )}
                       {a.publishedUrl && (
-                        <Link href={a.publishedUrl}>
-                          View published content ↗
+                        <Link href={a.publishedUrl} target="_blank" style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#ffbe24" }}>
+                          View published post ↗
                         </Link>
                       )}
                     </div>
                   </article>
-                ))}
-              {!data.activities.some((a) => a.kind !== "CHAT") && (
-                <p>
-                  No activity yet. Generate a draft to meet your specialists.
+                );
+              })}
+
+              {!filteredActivities.length && (
+                <p style={{ color: "var(--a-muted)", padding: "20px 0", textAlign: "center" }}>
+                  No activities matching current filters.
                 </p>
               )}
             </div>
           </section>
         </>
       )}
+
+      {/* Comprehensive Specialist Management Dialog */}
       {editing && (
         <div className="admin-dialog-backdrop">
           <section
@@ -335,324 +564,797 @@ export default function SpecialistsAdmin() {
             role="dialog"
             aria-modal="true"
             aria-label="Manage specialist"
+            style={{ width: "min(960px, 96vw)", maxHeight: "92vh" }}
           >
-            <header>
-              <h2>Manage {editing.user.name}</h2>
-              <button onClick={() => setEditing(null)} disabled={busy}>
-                Close
+            <header style={{ borderBottom: "1px solid var(--a-line)", paddingBottom: "16px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <img
+                  src={editing.user.image || "/Atlas.jpg"}
+                  alt=""
+                  style={{ width: "44px", height: "44px", borderRadius: "12px", objectFit: "cover", border: "2px solid #ffbe24" }}
+                />
+                <div>
+                  <h2 style={{ fontSize: "20px", margin: 0 }}>Manage {editing.user.name}</h2>
+                  <span style={{ fontSize: "12px", color: "var(--a-gold)" }}>{editing.title}</span>
+                </div>
+              </div>
+              <button onClick={() => setEditing(null)} disabled={busy} style={{ background: "transparent", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--a-muted)" }}>
+                ✕
               </button>
             </header>
-            {error && (
-              <p className="admin-alert" role="alert">
-                {error}
-              </p>
-            )}
+
+            {/* Navigation Tabs */}
+            <div className="admin-modal-nav">
+              <button
+                className={activeTab === "profile" ? "active" : ""}
+                onClick={() => setActiveTab("profile")}
+              >
+                👤 Profile & Persona
+              </button>
+              <button
+                className={activeTab === "schedule" ? "active" : ""}
+                onClick={() => setActiveTab("schedule")}
+              >
+                🗓️ Schedule & Posting
+              </button>
+              <button
+                className={activeTab === "knowledge" ? "active" : ""}
+                onClick={() => setActiveTab("knowledge")}
+              >
+                🧠 Custom Knowledge ({editing.knowledge.length})
+              </button>
+              <button
+                className={activeTab === "engine" ? "active" : ""}
+                onClick={() => setActiveTab("engine")}
+              >
+                ⚙️ AI Brain & Guardrails
+              </button>
+              <button
+                className={activeTab === "playground" ? "active" : ""}
+                onClick={() => setActiveTab("playground")}
+              >
+                🧪 Live Playground
+              </button>
+            </div>
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 void save();
               }}
             >
-              <div className="admin-form-grid">
-                <label>
-                  Name
-                  <input
-                    value={editing.user.name}
-                    onChange={(e) =>
-                      update({
-                        user: { ...editing.user, name: e.target.value },
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Profile image URL
-                  <input
-                    value={editing.user.image || ""}
-                    onChange={(e) =>
-                      update({
-                        user: { ...editing.user, image: e.target.value },
-                      })
-                    }
-                  />
-                </label>
-                <label className="wide">
-                  Professional title
-                  <input
-                    value={editing.title}
-                    onChange={(e) => update({ title: e.target.value })}
-                  />
-                </label>
-                <label className="wide">
-                  About
-                  <textarea
-                    value={editing.about}
-                    onChange={(e) => update({ about: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Personality
-                  <textarea
-                    value={editing.personality}
-                    onChange={(e) => update({ personality: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Boundaries
-                  <textarea
-                    value={editing.boundaries}
-                    onChange={(e) => update({ boundaries: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Expertise (one per line)
-                  <textarea
-                    value={editing.expertise.join("\n")}
-                    onChange={(e) =>
-                      update({ expertise: e.target.value.split("\n") })
-                    }
-                  />
-                </label>
-                <label>
-                  Conversation starters (3–5 lines)
-                  <textarea
-                    value={editing.starters.join("\n")}
-                    onChange={(e) =>
-                      update({ starters: e.target.value.split("\n") })
-                    }
-                  />
-                </label>
-                <label className="wide">
-                  Signature
-                  <input
-                    value={editing.signature}
-                    onChange={(e) => update({ signature: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Provider
-                  <select
-                    value={editing.provider}
-                    onChange={(e) => update({ provider: e.target.value })}
-                  >
-                    <option value="auto">Automatic / Atlas preference</option>
-                    <option value="openai">OpenAI first</option>
-                    <option value="claude">Claude first</option>
-                  </select>
-                </label>
-                <label>
-                  Posts per week (0–5)
-                  <input
-                    type="number"
-                    min={0}
-                    max={5}
-                    value={editing.weeklyPosts}
-                    onChange={(e) =>
-                      update({ weeklyPosts: Number(e.target.value) })
-                    }
-                  />
-                </label>
-                <label>
-                  Destination
-                  <select
-                    value={editing.destination}
-                    onChange={(e) =>
-                      update({
-                        destination: e.target.value,
-                        destinationId: null,
-                      })
-                    }
-                  >
-                    {["FEED", "GROUP", "FORUM", "NETWORK"].map((v) => (
-                      <option key={v}>{v}</option>
-                    ))}
-                  </select>
-                </label>
-                {editing.destination !== "FEED" && (
+              {/* TAB 1: PROFILE & PERSONA */}
+              {activeTab === "profile" && (
+                <div className="admin-form-grid animate-in fade-in duration-200">
                   <label>
-                    Community space
-                    <select
-                      value={editing.destinationId || ""}
-                      onChange={(e) =>
-                        update({ destinationId: e.target.value })
-                      }
-                    >
-                      <option value="">Choose a destination</option>
-                      {destinations?.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
+                    Specialist Name
+                    <input
+                      value={editing.user.name}
+                      onChange={(e) => update({ user: { ...editing.user, name: e.target.value } })}
+                      placeholder="e.g. Celeste Rowan"
+                    />
+                  </label>
+
+                  <label>
+                    Professional Title & Headline
+                    <input
+                      value={editing.title}
+                      onChange={(e) => update({ title: e.target.value })}
+                      placeholder="e.g. Tax Education & Due Diligence Coach"
+                    />
+                  </label>
+
+                  {/* Avatar Picker & Image Uploader */}
+                  <div className="wide" style={{ background: "var(--a-inner)", padding: "16px", borderRadius: "14px", border: "1px solid var(--a-line)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "13px", fontWeight: 700 }}>Profile Avatar Image</span>
+                      <button
+                        type="button"
+                        disabled={uploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
+                        style={{ fontSize: "12px", padding: "6px 12px", background: "var(--a-panel)", border: "1px solid var(--a-line)", borderRadius: "8px", cursor: "pointer" }}
+                      >
+                        {uploadingImage ? "Uploading…" : "📤 Upload Custom Photo"}
+                      </button>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={handleImageUpload}
+                      />
+                    </div>
+
+                    <div className="admin-avatar-grid">
+                      {PRESET_AVATARS.map((preset) => (
+                        <div
+                          key={preset.image}
+                          className={`admin-avatar-thumb ${editing.user.image === preset.image ? "selected" : ""}`}
+                          onClick={() => update({ user: { ...editing.user, image: preset.image } })}
+                          title={preset.name}
+                        >
+                          <img src={preset.image} alt={preset.name} />
+                        </div>
                       ))}
+                    </div>
+
+                    <div style={{ marginTop: "12px" }}>
+                      <input
+                        value={editing.user.image || ""}
+                        onChange={(e) => update({ user: { ...editing.user, image: e.target.value } })}
+                        placeholder="Or enter direct image URL (e.g. /Nova.jpg or https://...)"
+                        style={{ fontSize: "12px", padding: "8px 12px" }}
+                      />
+                    </div>
+                  </div>
+
+                  <label className="wide">
+                    About / Bio
+                    <textarea
+                      value={editing.about}
+                      onChange={(e) => update({ about: e.target.value })}
+                      rows={3}
+                      placeholder="Public bio displayed on the specialist's member profile..."
+                    />
+                  </label>
+
+                  {/* Specialties Tag Manager */}
+                  <div className="wide">
+                    <span style={{ fontSize: "12px", fontWeight: 650, display: "block", marginBottom: "6px" }}>
+                      Specialties / Expertise Tags
+                    </span>
+                    <div className="admin-chip-container">
+                      {editing.expertise.map((tag, idx) => (
+                        <span className="admin-chip" key={idx}>
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => update({ expertise: editing.expertise.filter((_, i) => i !== idx) })}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                      <div style={{ display: "flex", gap: "6px", flex: 1, minWidth: "160px" }}>
+                        <input
+                          value={newTag}
+                          onChange={(e) => setNewTag(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newTag.trim()) {
+                              e.preventDefault();
+                              if (!editing.expertise.includes(newTag.trim())) {
+                                update({ expertise: [...editing.expertise, newTag.trim()] });
+                              }
+                              setNewTag("");
+                            }
+                          }}
+                          placeholder="Type tag & press Enter..."
+                          style={{ border: "none", background: "transparent", padding: "4px", fontSize: "12px", outline: "none", width: "100%" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Starters */}
+                  <div className="wide">
+                    <span style={{ fontSize: "12px", fontWeight: 650, display: "block", marginBottom: "6px" }}>
+                      Conversation Starters (Member Prompt Suggestions)
+                    </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {editing.starters.map((starter, idx) => (
+                        <div key={idx} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                          <input
+                            value={starter}
+                            onChange={(e) => {
+                              const updated = [...editing.starters];
+                              updated[idx] = e.target.value;
+                              update({ starters: updated });
+                            }}
+                            style={{ flex: 1, padding: "8px 12px", fontSize: "12px" }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => update({ starters: editing.starters.filter((_, i) => i !== idx) })}
+                            style={{ padding: "8px 10px", background: "var(--a-inner)", border: "1px solid var(--a-line)", borderRadius: "8px", cursor: "pointer" }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                        <input
+                          value={newStarter}
+                          onChange={(e) => setNewStarter(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newStarter.trim()) {
+                              e.preventDefault();
+                              update({ starters: [...editing.starters, newStarter.trim()] });
+                              setNewStarter("");
+                            }
+                          }}
+                          placeholder="Add new conversation starter..."
+                          style={{ flex: 1, padding: "8px 12px", fontSize: "12px" }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newStarter.trim()) {
+                              update({ starters: [...editing.starters, newStarter.trim()] });
+                              setNewStarter("");
+                            }
+                          }}
+                          style={{ padding: "8px 14px", background: "var(--a-inner)", border: "1px solid var(--a-line)", borderRadius: "8px", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="wide">
+                    Signature & Closing Sign-off
+                    <input
+                      value={editing.signature}
+                      onChange={(e) => update({ signature: e.target.value })}
+                      placeholder="e.g. I help you understand the rule — not just memorize the answer."
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* TAB 2: SCHEDULE & POSTING */}
+              {activeTab === "schedule" && (
+                <div className="admin-form-grid animate-in fade-in duration-200">
+                  <div className="wide" style={{ background: "var(--a-inner)", padding: "16px", borderRadius: "14px", border: "1px solid var(--a-line)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                      <div>
+                        <strong style={{ fontSize: "15px", display: "block" }}>Specialist Activity Status</strong>
+                        <span style={{ fontSize: "12px", color: "var(--a-muted)" }}>Enable or temporarily pause this AI specialist</span>
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={editing.enabled}
+                          onChange={(e) => update({ enabled: e.target.checked })}
+                          style={{ width: "18px", height: "18px" }}
+                        />
+                        <span style={{ fontWeight: 700, fontSize: "14px", color: editing.enabled ? "#10b981" : "var(--a-muted)" }}>
+                          {editing.enabled ? "Active & Posting" : "Paused"}
+                        </span>
+                      </label>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "14px", borderTop: "1px solid var(--a-line)" }}>
+                      <div>
+                        <strong style={{ fontSize: "14px", display: "block" }}>Publishing Mode</strong>
+                        <span style={{ fontSize: "12px", color: "var(--a-muted)" }}>Auto-publish live posts or send to queue for admin review</span>
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={editing.autoPublish}
+                          onChange={(e) => update({ autoPublish: e.target.checked })}
+                          style={{ width: "18px", height: "18px" }}
+                        />
+                        <span style={{ fontWeight: 700, fontSize: "13px" }}>
+                          {editing.autoPublish ? "⚡ Auto-Publish Live" : "📝 Review Drafts First"}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Specific Posting Days */}
+                  <div className="wide" style={{ background: "var(--a-inner)", padding: "16px", borderRadius: "14px", border: "1px solid var(--a-line)" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 700, display: "block" }}>
+                      Weekly Posting Schedule Days
+                    </span>
+                    <span style={{ fontSize: "12px", color: "var(--a-muted)", display: "block", marginBottom: "10px" }}>
+                      Select the specific days of the week when this bot should publish automated posts:
+                    </span>
+
+                    <div className="admin-day-grid">
+                      {DAYS_OF_WEEK.map((day) => {
+                        const isSelected = (editing.postDays || []).includes(day);
+                        return (
+                          <button
+                            type="button"
+                            key={day}
+                            className={`admin-day-btn ${isSelected ? "selected" : ""}`}
+                            onClick={() => {
+                              const current = editing.postDays || [];
+                              const updated = isSelected
+                                ? current.filter((d) => d !== day)
+                                : [...current, day];
+                              update({ postDays: updated, weeklyPosts: updated.length || 1 });
+                            }}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <label>
+                    Preferred Post Time (UTC)
+                    <select
+                      value={editing.postTime || "14:00"}
+                      onChange={(e) => update({ postTime: e.target.value })}
+                    >
+                      <option value="09:00">09:00 UTC (Early Morning)</option>
+                      <option value="12:00">12:00 UTC (Midday)</option>
+                      <option value="14:00">14:00 UTC (Standard 10am EST)</option>
+                      <option value="17:00">17:00 UTC (Afternoon 1pm EST)</option>
+                      <option value="20:00">20:00 UTC (Evening 4pm EST)</option>
                     </select>
                   </label>
-                )}
-                <label className="wide">
-                  Course expertise (one per line)
-                  <textarea
-                    value={editing.courseNames.join("\n")}
-                    onChange={(e) =>
-                      update({
-                        courseNames: e.target.value.split("\n").filter(Boolean),
-                      })
-                    }
-                  />
-                </label>
-              </div>
-              <div className="admin-actions">
-                {(["enabled", "autoPublish", "autoReply"] as const).map(
-                  (key) => (
-                    <label key={key}>
-                      <input
-                        type="checkbox"
-                        checked={editing[key]}
-                        onChange={(e) => update({ [key]: e.target.checked })}
-                      />
-                      {key === "enabled"
-                        ? "Enabled"
-                        : key === "autoPublish"
-                          ? "Auto-publish scheduled posts"
-                          : "Respond when invited"}
-                    </label>
-                  ),
-                )}
-              </div>
-              <h3>Approved knowledge</h3>
-              <p className="admin-hint">
-                Priority: 1 government law, 2 IRS forms, 3 Treasury / IRS
-                rulings, 4 TCP training, 5 platform FAQs, 6 general education.
-                Paste verified excerpts; links alone do not train the bot.
-              </p>
-              {editing.knowledge.map((k, i) => (
-                <fieldset className="admin-knowledge" key={i}>
-                  <input
-                    aria-label="Source title"
-                    placeholder="Source title"
-                    value={k.title}
-                    onChange={(e) =>
-                      update({
-                        knowledge: editing.knowledge.map((x, j) =>
-                          j === i ? { ...x, title: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                  <input
-                    aria-label="Source URL"
-                    placeholder="https://…"
-                    value={k.url || ""}
-                    onChange={(e) =>
-                      update({
-                        knowledge: editing.knowledge.map((x, j) =>
-                          j === i ? { ...x, url: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                  <textarea
-                    aria-label="Approved source text"
-                    placeholder="Verified source excerpt"
-                    value={k.text}
-                    onChange={(e) =>
-                      update({
-                        knowledge: editing.knowledge.map((x, j) =>
-                          j === i ? { ...x, text: e.target.value } : x,
-                        ),
-                      })
-                    }
-                  />
-                  <div className="admin-actions">
+
+                  <label>
+                    Weekly Post Volume
+                    <input
+                      type="number"
+                      min={0}
+                      max={7}
+                      value={editing.weeklyPosts}
+                      onChange={(e) => update({ weeklyPosts: Number(e.target.value) })}
+                    />
+                  </label>
+
+                  <label>
+                    Post Target Destination
+                    <select
+                      value={editing.destination}
+                      onChange={(e) => update({ destination: e.target.value as any, destinationId: null })}
+                    >
+                      <option value="FEED">Main Community Feed</option>
+                      <option value="GROUP">Community Group</option>
+                      <option value="FORUM">Pro Hub / Forum</option>
+                      <option value="NETWORK">Pro Network</option>
+                    </select>
+                  </label>
+
+                  {editing.destination !== "FEED" && (
                     <label>
-                      Priority
-                      <input
-                        type="number"
-                        min={1}
-                        max={6}
-                        value={k.priority}
-                        onChange={(e) =>
-                          update({
-                            knowledge: editing.knowledge.map((x, j) =>
-                              j === i
-                                ? { ...x, priority: Number(e.target.value) }
-                                : x,
-                            ),
-                          })
-                        }
-                      />
+                      Select Destination Space
+                      <select
+                        value={editing.destinationId || ""}
+                        onChange={(e) => update({ destinationId: e.target.value })}
+                      >
+                        <option value="">Choose a destination...</option>
+                        {destinations?.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
                     </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={k.approved}
-                        onChange={(e) =>
-                          update({
-                            knowledge: editing.knowledge.map((x, j) =>
-                              j === i
-                                ? {
-                                    ...x,
-                                    approved: e.target.checked,
-                                    reviewedAt: new Date().toISOString(),
-                                  }
-                                : x,
-                            ),
-                          })
-                        }
-                      />
-                      Approved
-                    </label>
+                  )}
+
+                  {/* Instant Trigger Actions */}
+                  <div className="wide" style={{ display: "flex", gap: "10px", marginTop: "10px", borderTop: "1px solid var(--a-line)", paddingTop: "16px" }}>
                     <button
                       type="button"
-                      onClick={() =>
-                        update({
-                          knowledge: editing.knowledge.filter(
-                            (_, j) => j !== i,
-                          ),
-                        })
-                      }
+                      disabled={busy}
+                      onClick={() => action("draft", editing.id)}
+                      style={{ padding: "9px 16px", borderRadius: "10px", background: "var(--a-inner)", border: "1px solid var(--a-line)", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}
                     >
-                      Remove source
+                      📝 Generate Draft Now
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => action("postNow", editing.id)}
+                      style={{ padding: "9px 16px", borderRadius: "10px", background: "#ffbe24", color: "#0f172a", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800 }}
+                    >
+                      ⚡ Post Live Now
                     </button>
                   </div>
-                </fieldset>
-              ))}
-              <button
-                type="button"
-                onClick={() =>
-                  update({
-                    knowledge: [
-                      ...editing.knowledge,
-                      { title: "", text: "", priority: 4, approved: false },
-                    ],
-                  })
-                }
-              >
-                Add knowledge source
-              </button>
-              <footer className="admin-actions">
-                <button className="admin-primary" disabled={busy}>
-                  {busy ? "Saving…" : "Save specialist"}
+                </div>
+              )}
+
+              {/* TAB 3: CUSTOM KNOWLEDGE BASE */}
+              {activeTab === "knowledge" && (
+                <div className="animate-in fade-in duration-200">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <strong style={{ fontSize: "15px", display: "block" }}>Specialist Knowledge Base</strong>
+                      <span style={{ fontSize: "12px", color: "var(--a-muted)" }}>
+                        Feed verified IRS tax codes, form rules, firm SOPs, and course content.
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newK: Knowledge = {
+                            title: "New Knowledge Source",
+                            category: "IRS Guidance",
+                            text: "",
+                            priority: 2,
+                            approved: true,
+                            reviewedAt: new Date().toISOString(),
+                          };
+                          update({ knowledge: [newK, ...editing.knowledge] });
+                        }}
+                        style={{ padding: "7px 14px", borderRadius: "8px", background: "#ffbe24", color: "#0f172a", border: "none", fontSize: "12px", fontWeight: 800, cursor: "pointer" }}
+                      >
+                        + Add Source
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Pre-built Knowledge Templates */}
+                  <div style={{ background: "var(--a-inner)", padding: "12px 16px", borderRadius: "12px", border: "1px solid var(--a-line)", marginBottom: "16px" }}>
+                    <span style={{ fontSize: "11.5px", fontWeight: 700, color: "var(--a-gold)", display: "block", marginBottom: "6px" }}>
+                      ⚡ Quick Add Tax Knowledge Templates:
+                    </span>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      {KNOWLEDGE_TEMPLATES.map((tmpl, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const newK: Knowledge = {
+                              ...tmpl,
+                              approved: true,
+                              reviewedAt: new Date().toISOString(),
+                            };
+                            update({ knowledge: [newK, ...editing.knowledge] });
+                          }}
+                          style={{ padding: "4px 10px", borderRadius: "6px", background: "var(--a-panel)", border: "1px solid var(--a-line)", fontSize: "11px", cursor: "pointer", fontWeight: 650 }}
+                        >
+                          + {tmpl.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filter & Search */}
+                  <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                      <input
+                        value={knowledgeSearch}
+                        onChange={(e) => setKnowledgeSearch(e.target.value)}
+                        placeholder="Search knowledge sources..."
+                        style={{ paddingLeft: "32px", fontSize: "12px" }}
+                      />
+                      <Search01Icon size={14} style={{ position: "absolute", left: "10px", top: "12px", color: "var(--a-muted)" }} />
+                    </div>
+                    <select
+                      value={knowledgeCategoryFilter}
+                      onChange={(e) => setKnowledgeCategoryFilter(e.target.value)}
+                      style={{ width: "auto", fontSize: "12px" }}
+                    >
+                      <option value="ALL">All Categories</option>
+                      <option value="IRS Guidance">IRS Guidance</option>
+                      <option value="Tax Code / Law">Tax Code / Law</option>
+                      <option value="Firm SOP">Firm SOP</option>
+                      <option value="TCP Training">TCP Training</option>
+                      <option value="Platform FAQ">Platform FAQ</option>
+                    </select>
+                  </div>
+
+                  {/* Knowledge Cards List */}
+                  <div style={{ maxHeight: "420px", overflowY: "auto", paddingRight: "4px" }}>
+                    {filteredKnowledge.map((k, i) => (
+                      <div className="admin-knowledge-card" key={i}>
+                        <div className="admin-knowledge-header">
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
+                            <input
+                              value={k.title}
+                              onChange={(e) => {
+                                const next = [...editing.knowledge];
+                                next[i] = { ...k, title: e.target.value };
+                                update({ knowledge: next });
+                              }}
+                              placeholder="Source Title (e.g. IRC § 162 Expense Deduction Rules)"
+                              style={{ fontWeight: 700, fontSize: "13px", padding: "6px 10px" }}
+                            />
+                            <select
+                              value={k.category || "IRS Guidance"}
+                              onChange={(e) => {
+                                const next = [...editing.knowledge];
+                                next[i] = { ...k, category: e.target.value };
+                                update({ knowledge: next });
+                              }}
+                              style={{ width: "auto", fontSize: "11px", padding: "4px 8px" }}
+                            >
+                              <option value="IRS Guidance">IRS Guidance</option>
+                              <option value="Tax Code / Law">Tax Code / Law</option>
+                              <option value="Firm SOP">Firm SOP</option>
+                              <option value="TCP Training">TCP Training</option>
+                              <option value="Platform FAQ">Platform FAQ</option>
+                              <option value="General">General</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => update({ knowledge: editing.knowledge.filter((_, j) => j !== i) })}
+                            style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", padding: "4px" }}
+                            title="Delete knowledge source"
+                          >
+                            <Delete02Icon size={16} />
+                          </button>
+                        </div>
+
+                        <div style={{ margin: "8px 0" }}>
+                          <textarea
+                            value={k.text}
+                            onChange={(e) => {
+                              const next = [...editing.knowledge];
+                              next[i] = { ...k, text: e.target.value };
+                              update({ knowledge: next });
+                            }}
+                            rows={3}
+                            placeholder="Verified source text or regulatory excerpt..."
+                            style={{ fontSize: "12px", lineHeight: "1.6" }}
+                          />
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap", fontSize: "12px" }}>
+                          <input
+                            value={k.url || ""}
+                            onChange={(e) => {
+                              const next = [...editing.knowledge];
+                              next[i] = { ...k, url: e.target.value };
+                              update({ knowledge: next });
+                            }}
+                            placeholder="Source URL citation (https://irs.gov/...)"
+                            style={{ flex: 1, minWidth: "180px", fontSize: "11px", padding: "4px 8px" }}
+                          />
+
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px" }}>
+                              Priority (1-6):
+                              <input
+                                type="number"
+                                min={1}
+                                max={6}
+                                value={k.priority}
+                                onChange={(e) => {
+                                  const next = [...editing.knowledge];
+                                  next[i] = { ...k, priority: Number(e.target.value) };
+                                  update({ knowledge: next });
+                                }}
+                                style={{ width: "45px", padding: "3px 6px", fontSize: "11px" }}
+                              />
+                            </label>
+
+                            <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", cursor: "pointer" }}>
+                              <input
+                                type="checkbox"
+                                checked={k.approved}
+                                onChange={(e) => {
+                                  const next = [...editing.knowledge];
+                                  next[i] = { ...k, approved: e.target.checked, reviewedAt: new Date().toISOString() };
+                                  update({ knowledge: next });
+                                }}
+                              />
+                              Approved
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {!filteredKnowledge.length && (
+                      <p style={{ color: "var(--a-muted)", padding: "20px 0", textAlign: "center", fontSize: "13px" }}>
+                        No knowledge sources found. Click "+ Add Source" or choose a template above.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: AI BRAIN & GUARDRAILS */}
+              {activeTab === "engine" && (
+                <div className="admin-form-grid animate-in fade-in duration-200">
+                  <label>
+                    AI Provider
+                    <select
+                      value={editing.provider}
+                      onChange={(e) => update({ provider: e.target.value as any })}
+                    >
+                      <option value="auto">Automatic / Atlas Preference</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="claude">Anthropic Claude</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    AI Model
+                    <select
+                      value={editing.model || "auto"}
+                      onChange={(e) => update({ model: e.target.value })}
+                    >
+                      <option value="auto">Default / Auto</option>
+                      <option value="gpt-4o">OpenAI GPT-4o (High Intelligence)</option>
+                      <option value="gpt-4o-mini">OpenAI GPT-4o Mini (Fast & Efficient)</option>
+                      <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Nuanced Analysis)</option>
+                      <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Post Tone & Voice
+                    <select
+                      value={editing.postTone || "authoritative"}
+                      onChange={(e) => update({ postTone: e.target.value })}
+                    >
+                      <option value="authoritative">Authoritative, Calm & Protective</option>
+                      <option value="mentor">Coach & Mentor (Clear & Encouraging)</option>
+                      <option value="friendly">Warm, Polished & Beginner-Friendly</option>
+                      <option value="analytical">Sharp, Analytical & Evidence-Seeking</option>
+                      <option value="conversational">Conversational Peer Practitioner</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Post Length Preference
+                    <select
+                      value={editing.postLength || "standard"}
+                      onChange={(e) => update({ postLength: e.target.value })}
+                    >
+                      <option value="short">Short & Punchy (2–3 sentences, &lt;45 words)</option>
+                      <option value="standard">Standard Community Post (3–4 sentences, 35–65 words)</option>
+                      <option value="deep-dive">Technical Deep Dive (4–6 sentences with bullets)</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Temperature / Strictness ({editing.temperature ?? 0.7})
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={editing.temperature ?? 0.7}
+                      onChange={(e) => update({ temperature: Number(e.target.value) })}
+                      style={{ accentColor: "#ffbe24" }}
+                    />
+                  </label>
+
+                  <label>
+                    Max Auto-Replies Per Day
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={editing.maxDailyReplies || 20}
+                      onChange={(e) => update({ maxDailyReplies: Number(e.target.value) })}
+                    />
+                  </label>
+
+                  <label className="wide">
+                    Personality & Behavioral Instructions
+                    <textarea
+                      value={editing.personality}
+                      onChange={(e) => update({ personality: e.target.value })}
+                      rows={3}
+                    />
+                  </label>
+
+                  <label className="wide">
+                    Boundaries & Safety Constraints (What bot must NEVER say)
+                    <textarea
+                      value={editing.boundaries}
+                      onChange={(e) => update({ boundaries: e.target.value })}
+                      rows={3}
+                    />
+                  </label>
+
+                  <label className="wide">
+                    Additional Custom System Instructions (Appended directly to system prompt)
+                    <textarea
+                      value={editing.customPrompt || ""}
+                      onChange={(e) => update({ customPrompt: e.target.value })}
+                      rows={2}
+                      placeholder="Optional custom instructions, seasonal tax tips, or firm-specific guidance..."
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* TAB 5: TEST PLAYGROUND */}
+              {activeTab === "playground" && (
+                <div className="animate-in fade-in duration-200">
+                  <div style={{ background: "var(--a-inner)", padding: "16px", borderRadius: "14px", border: "1px solid var(--a-line)" }}>
+                    <strong style={{ fontSize: "14px", display: "block", marginBottom: "4px" }}>
+                      🧪 Interactive Specialist Playground
+                    </strong>
+                    <span style={{ fontSize: "12px", color: "var(--a-muted)", display: "block", marginBottom: "12px" }}>
+                      Test how {editing.user.name} responds with its configured knowledge, persona, and tone before saving changes.
+                    </span>
+
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+                      <input
+                        value={testQuestion}
+                        onChange={(e) => setTestQuestion(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !testLoading) {
+                            e.preventDefault();
+                            void runPlaygroundTest();
+                          }
+                        }}
+                        placeholder={`Ask ${editing.user.name} a tax question or scenario...`}
+                        style={{ flex: 1, padding: "10px 14px", fontSize: "13px" }}
+                      />
+                      <button
+                        type="button"
+                        disabled={testLoading || !testQuestion.trim()}
+                        onClick={() => void runPlaygroundTest()}
+                        style={{ padding: "10px 20px", borderRadius: "10px", background: "#ffbe24", color: "#0f172a", border: "none", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}
+                      >
+                        {testLoading ? "Thinking…" : "Test Bot"}
+                      </button>
+                    </div>
+
+                    {/* Quick sample test questions */}
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
+                      <span style={{ fontSize: "11px", color: "var(--a-muted)" }}>Try asking:</span>
+                      {[
+                        "What due diligence is required for Head of Household?",
+                        "My client lost all receipts for Schedule C mileage. What can we do?",
+                        "How should I structure pricing for a new tax firm?",
+                      ].map((sample, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => { setTestQuestion(sample); }}
+                          style={{ padding: "3px 8px", borderRadius: "6px", background: "var(--a-panel)", border: "1px solid var(--a-line)", fontSize: "11px", cursor: "pointer" }}
+                        >
+                          "{sample.slice(0, 32)}…"
+                        </button>
+                      ))}
+                    </div>
+
+                    {testAnswer && (
+                      <div className="admin-playground-response">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", borderBottom: "1px solid var(--a-line)", paddingBottom: "6px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--a-gold)" }}>
+                            🤖 {editing.user.name} Response:
+                          </span>
+                          {testAnswer.provider && (
+                            <span style={{ fontSize: "11px", color: "var(--a-muted)" }}>
+                              Provider: {testAnswer.provider}
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ margin: 0, fontSize: "13.5px", whiteSpace: "pre-wrap" }}>
+                          {testAnswer.text}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Action Footer */}
+              <footer style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", paddingTop: "16px", borderTop: "1px solid var(--a-line)" }}>
+                <button
+                  type="button"
+                  onClick={() => setEditing(null)}
+                  style={{ background: "transparent", border: "1px solid var(--a-line)", padding: "10px 18px", borderRadius: "10px", cursor: "pointer" }}
+                >
+                  Cancel
                 </button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="submit"
+                    className="admin-primary"
+                    disabled={busy}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <CheckmarkCircle01Icon size={16} /> {busy ? "Saving…" : "Save Specialist"}
+                  </button>
+                </div>
               </footer>
             </form>
-            <h3>Assign as course instructor</h3>
-            <p className="admin-hint">
-              This changes the instructor of an existing course.
-            </p>
-            {data?.courses.map((c) => (
-              <div className="admin-course-row" key={c.id}>
-                <span>{c.title}</span>
-                <button
-                  disabled={busy || c.instructorId === editing.userId}
-                  onClick={() =>
-                    action("assignCourse", editing.id, { courseId: c.id })
-                  }
-                >
-                  {c.instructorId === editing.userId ? "Assigned" : "Assign"}
-                </button>
-              </div>
-            ))}
           </section>
         </div>
       )}
+
+      {/* Draft Editor Dialog */}
       {draft && (
         <div className="admin-dialog-backdrop">
           <section
@@ -661,22 +1363,31 @@ export default function SpecialistsAdmin() {
             aria-modal="true"
             aria-label="Edit draft"
           >
-            <h2>Edit draft</h2>
+            <header>
+              <h2>Edit Generated Draft</h2>
+              <button onClick={() => setDraft(null)}>✕</button>
+            </header>
             <textarea
               aria-label="Draft content"
-              rows={12}
+              rows={10}
               value={draft.content}
               onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+              style={{ fontSize: "14px", lineHeight: "1.6" }}
             />
-            <div className="admin-actions">
+            <div className="admin-actions" style={{ marginTop: "16px" }}>
               <button
                 disabled={busy}
                 className="admin-primary"
-                onClick={() =>
-                  action("editDraft", draft.id, { content: draft.content })
-                }
+                onClick={() => action("editDraft", draft.id, { content: draft.content })}
               >
-                Save draft
+                Save Draft
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => action("publish", draft.id)}
+                style={{ background: "#10b981", color: "#fff", border: "none" }}
+              >
+                Publish Now
               </button>
               <button onClick={() => setDraft(null)}>Cancel</button>
             </div>

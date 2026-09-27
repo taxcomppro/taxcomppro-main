@@ -6,6 +6,8 @@ import {
   initializeSpecialists,
   generateActivity,
   publishActivity,
+  runSchedule,
+  testSpecialistPlayground,
 } from "@/lib/specialists/service";
 import { z } from "zod";
 export const maxDuration = 120;
@@ -23,31 +25,42 @@ const config = z.object({
   image: safeUrl,
   title: z.string().min(1).max(180),
   about: z.string().min(1).max(3000),
-  expertise: z.array(z.string().max(120)).max(15),
-  starters: z.array(z.string().max(300)).min(3).max(5),
+  expertise: z.array(z.string().max(120)).max(25),
+  starters: z.array(z.string().max(300)).max(10),
   signature: z.string().max(300),
-  courseNames: z.array(z.string().max(200)).max(10),
+  courseNames: z.array(z.string().max(200)).max(15),
   personality: z.string().max(4000),
   boundaries: z.string().max(4000),
   provider: z.enum(["auto", "openai", "claude"]),
+  model: z.string().max(100).default("auto"),
+  temperature: z.number().min(0).max(1).default(0.7),
+  postTone: z.string().max(50).default("authoritative"),
+  postLength: z.string().max(50).default("standard"),
+  postDays: z.array(z.string().max(20)).default([]),
+  postTime: z.string().max(20).default("14:00"),
+  timezone: z.string().max(50).default("UTC"),
+  maxDailyReplies: z.number().int().min(0).max(200).default(20),
+  customPrompt: z.string().max(10000).nullable().optional(),
   enabled: z.boolean(),
   autoPublish: z.boolean(),
   autoReply: z.boolean(),
-  weeklyPosts: z.number().int().min(0).max(5),
+  weeklyPosts: z.number().int().min(0).max(7),
   destination: z.enum(["FEED", "GROUP", "FORUM", "NETWORK"]),
   destinationId: z.string().nullable(),
   knowledge: z
     .array(
       z.object({
+        id: z.string().optional(),
         title: z.string().max(200),
-        text: z.string().max(12000),
+        category: z.string().max(100).optional(),
+        text: z.string().max(20000),
         url: safeUrl.optional(),
         priority: z.number().int().min(1).max(6),
         approved: z.boolean(),
         reviewedAt: z.string().max(40).optional(),
       }),
     )
-    .max(50),
+    .max(100),
 });
 export async function GET(req: NextRequest) {
   if (!(await isAdmin(req.headers)))
@@ -60,7 +73,7 @@ export async function GET(req: NextRequest) {
         },
         orderBy: { id: "asc" },
       }),
-      prisma.aiActivity.findMany({ orderBy: { createdAt: "desc" }, take: 60 }),
+      prisma.aiActivity.findMany({ orderBy: { createdAt: "desc" }, take: 80 }),
       prisma.community.findMany({ select: { id: true, name: true } }),
       prisma.forum.findMany({ select: { id: true, name: true } }),
       prisma.proNetwork.findMany({ select: { id: true, name: true } }),
@@ -107,6 +120,34 @@ export async function POST(req: NextRequest) {
           `manual:${crypto.randomUUID()}`,
         ),
       );
+    }
+    if (body.action === "postNow") {
+      const bot = await prisma.aiSpecialist.findUniqueOrThrow({
+        where: { id: String(body.id) },
+      });
+      return NextResponse.json(
+        await generateActivity(
+          { ...bot, autoPublish: true },
+          `instant:${crypto.randomUUID()}`,
+        ),
+      );
+    }
+    if (body.action === "runSchedule") {
+      const results = await runSchedule();
+      return NextResponse.json({ results });
+    }
+    if (body.action === "testPlayground") {
+      const question = z.string().min(1).max(3000).parse(body.question);
+      let bot: any = null;
+      if (body.temporaryBot) {
+        bot = body.temporaryBot;
+      } else {
+        bot = await prisma.aiSpecialist.findUniqueOrThrow({
+          where: { id: String(body.id) },
+        });
+      }
+      const answer = await testSpecialistPlayground(bot, question);
+      return NextResponse.json({ answer });
     }
     if (body.action === "editDraft") {
       const content = z.string().min(1).max(12000).parse(body.content);
@@ -183,6 +224,9 @@ export async function PATCH(req: NextRequest) {
           specialties: data.expertise,
         },
       },
+    },
+    include: {
+      user: { select: { name: true, image: true, profileSlug: true } },
     },
   });
   return NextResponse.json(bot);

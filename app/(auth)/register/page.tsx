@@ -463,10 +463,10 @@ function RegisterForm() {
         <div className="mx-auto w-full max-w-7xl">
           <div className="mb-4 sm:mb-6 flex justify-center">
             <Link href="/">
-              <Image src="/logo.webp" alt="TaxCompPro" width={135} height={46}
-                className="object-contain dark:hidden" style={{ width: "135px", height: "auto" }} priority />
-              <Image src="/logo_dark.webp" alt="TaxCompPro" width={135} height={46}
-                className="hidden object-contain dark:block" style={{ width: "135px", height: "auto" }} priority />
+              <Image src="/logo.webp" alt="Tax Compliance Pro" width={220} height={65}
+                className="object-contain dark:hidden" style={{ width: "220px", height: "auto", maxHeight: "65px" }} priority />
+              <Image src="/logo_dark.webp" alt="Tax Compliance Pro" width={220} height={65}
+                className="hidden object-contain dark:block" style={{ width: "220px", height: "auto", maxHeight: "65px" }} priority />
             </Link>
           </div>
 

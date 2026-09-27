@@ -74,7 +74,7 @@ export default function AcceptTrainingInvitePage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 font-[var(--font-urbanist,Urbanist),sans-serif] px-4 py-12">
       <div className="w-full max-w-[420px]">
         <div className="flex justify-center mb-6">
-          <Link href="/"><Image src="/logo.webp" alt="TaxCompPro" width={150} height={56} className="object-contain" style={{ width: "auto", height: "auto" }} loading="eager" /></Link>
+          <Link href="/"><Image src="/logo.webp" alt="Tax Compliance Pro" width={200} height={60} className="object-contain" style={{ width: "200px", height: "auto", maxHeight: "60px" }} loading="eager" /></Link>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8">
           <div className="w-12 h-12 rounded-2xl bg-[#0a1628] flex items-center justify-center mb-4"><GraduationCap className="w-6 h-6 text-white" /></div>

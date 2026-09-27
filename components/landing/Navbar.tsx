@@ -367,16 +367,16 @@ export default function Navbar() {
             <Image
               src="/logo.webp"
               alt="Tax Compliance Pro"
-              width={144}
-              height={57}
+              width={220}
+              height={70}
               className="site-logo-light"
               priority
             />
             <Image
               src="/logo_dark.webp"
               alt="Tax Compliance Pro"
-              width={144}
-              height={57}
+              width={220}
+              height={70}
               className="site-logo-dark"
               priority
             />

@@ -75,9 +75,9 @@
   align-items: center;
 }
 .site-logo img {
-  height: 44px;
+  height: 56px;
   width: auto;
-  max-width: 175px;
+  max-width: 220px;
   object-fit: contain;
 }
 .site-logo-dark {
@@ -693,8 +693,8 @@
   }
   .site-logo img {
     width: auto;
-    max-width: 155px;
-    height: 40px;
+    max-width: 195px;
+    height: 50px;
   }
 }
 @media (max-width: 1179px) {
@@ -726,8 +726,8 @@
   }
   .site-logo img {
     width: auto;
-    max-width: 140px;
-    height: 36px;
+    max-width: 175px;
+    height: 44px;
   }
   .site-atlas,
   .site-action-divider,

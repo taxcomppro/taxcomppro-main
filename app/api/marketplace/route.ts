@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
   const listings = await prisma.marketplaceListing.findMany({
     where: {
       status: "APPROVED",
+      isNetworkExclusive: false,
       ...(category && category !== "ALL" ? { category: category as "SERVICE" | "PRODUCT" | "NETWORK" | "TRAINING" } : {}),
       ...(search ? { OR: [
         { title:       { contains: search, mode: "insensitive" } },

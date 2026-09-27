@@ -10,11 +10,14 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const { listingId, listingIds, couponCode, refCode } = body as {
+  const { listingId, listingIds, couponCode, refCode, source, networkId, networkSlug } = body as {
     listingId?: string;
     listingIds?: string[];
     couponCode?: string;
     refCode?: string;
+    source?: string;
+    networkId?: string;
+    networkSlug?: string;
   };
 
   const rawIds = listingIds && Array.isArray(listingIds) && listingIds.length > 0
@@ -217,11 +220,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Provision any free listings immediately
+  // Provision any free listings immediately
   for (const freeId of freeListingIds) {
     await prisma.marketplacePurchase.upsert({
       where: { userId_listingId: { userId: session.user.id, listingId: freeId } },
-      create: { userId: session.user.id, listingId: freeId, price: 0 },
-      update: {},
+      create: {
+        userId: session.user.id,
+        listingId: freeId,
+        price: 0,
+        source: source || "MARKETPLACE",
+        networkId: networkId || null,
+      },
+      update: {
+        source: source || "MARKETPLACE",
+        networkId: networkId || null,
+      },
     }).catch(() => {});
 
     const freeListing = itemsToBuy.find((l) => l.id === freeId);
@@ -252,9 +265,20 @@ export async function POST(req: NextRequest) {
   const singleListing = paidListings[0];
   const primarySlugOrId = isSingleItem ? (singleListing.slug || singleListing.id) : "marketplace";
 
+  const successUrl = source === "PRO_NETWORK" && networkSlug
+    ? `${appUrl}/pro-networks/${networkSlug}?tab=shop&purchased=true&session_id={CHECKOUT_SESSION_ID}`
+    : `${appUrl}/marketplace?view=purchases&checkout_success=true&session_id={CHECKOUT_SESSION_ID}`;
+
+  const cancelUrl = source === "PRO_NETWORK" && networkSlug
+    ? `${appUrl}/pro-networks/${networkSlug}?tab=shop`
+    : `${appUrl}/${primarySlugOrId}`;
+
   const sessionMetadata: Record<string, string> = {
     userId: user.id,
     type: "marketplace",
+    source: source || "MARKETPLACE",
+    networkId: networkId || "",
+    networkSlug: networkSlug || "",
     listingIds: paidListings.map((l) => l.id).join(","),
     listingId: singleListing.id,
     itemCount: String(paidListings.length),
@@ -290,8 +314,8 @@ export async function POST(req: NextRequest) {
           payment_method_types: ["card"],
           customer_email: user.email ?? undefined,
           line_items: lineItems,
-          success_url: `${appUrl}/marketplace?view=purchases&checkout_success=true&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${appUrl}/${primarySlugOrId}`,
+          success_url: successUrl,
+          cancel_url: cancelUrl,
           metadata: {
             ...sessionMetadata,
             sellerId: seller.id,
@@ -313,8 +337,8 @@ export async function POST(req: NextRequest) {
       payment_method_types: ["card"],
       customer_email: user.email ?? undefined,
       line_items: lineItems,
-      success_url: `${appUrl}/marketplace?view=purchases&checkout_success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/marketplace`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: sessionMetadata,
     });
 

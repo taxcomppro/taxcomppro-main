@@ -268,27 +268,30 @@ model Verification {
 }
 
 model MarketplaceListing {
-  id          String          @id @default(cuid())
-  slug        String?         @unique
-  title       String
-  description String
-  category    ListingCategory
-  price       Float?
-  images      String[]
-  tags        String[]
-  status      ListingStatus   @default(PENDING)
-  isFeatured  Boolean         @default(false)
-  userId      String
-  viewCount   Int             @default(0)
-  metadata    Json?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id                 String          @id @default(cuid())
+  slug               String?         @unique
+  title              String
+  description        String
+  category           ListingCategory
+  price              Float?
+  images             String[]
+  tags               String[]
+  status             ListingStatus   @default(PENDING)
+  isFeatured         Boolean         @default(false)
+  isNetworkExclusive Boolean         @default(false)
+  exclusiveNetworkId String?
+  userId             String
+  viewCount          Int             @default(0)
+  metadata           Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   featuredRequests FeaturedListingRequest[]
   purchases        MarketplacePurchase[]
   coupons          MarketplaceCoupon[]
   referrals        MarketplaceReferral[]
+  networkProducts  ProNetworkProduct[]
 
   @@map("marketplace_listings")
 }
@@ -339,6 +342,8 @@ model MarketplacePurchase {
   listingId       String
   price           Float              @default(0)
   stripeSessionId String?            @unique
+  source          String             @default("MARKETPLACE") // "MARKETPLACE", "PRO_NETWORK", "PROFILE", "EVENT"
+  networkId       String?
   createdAt       DateTime           @default(now())
 
   user    User               @relation(fields: [userId],    references: [id], onDelete: Cascade)
@@ -1757,8 +1762,24 @@ model ProNetwork {
   events              ProNetworkEvent[]
   chatMessages        ProNetworkChatMessage[]
   questions           ProNetworkQuestion[]
+  products            ProNetworkProduct[]
 
   @@map("pro_networks")
+}
+
+model ProNetworkProduct {
+  id         String             @id @default(cuid())
+  networkId  String
+  listingId  String
+  order      Int                @default(0)
+  isFeatured Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+
+  network    ProNetwork         @relation(fields: [networkId], references: [id], onDelete: Cascade)
+  listing    MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([networkId, listingId])
+  @@map("pro_network_products")
 }
 
 model ProNetworkMember {
@@ -2009,6 +2030,15 @@ model AiSpecialist {
   personality String @db.Text
   boundaries String @db.Text
   provider String @default("auto")
+  model String @default("auto")
+  temperature Float @default(0.7)
+  postTone String @default("authoritative")
+  postLength String @default("standard")
+  postDays String[] @default([])
+  postTime String @default("14:00")
+  timezone String @default("UTC")
+  maxDailyReplies Int @default(20)
+  customPrompt String? @db.Text
   enabled Boolean @default(true)
   autoPublish Boolean @default(false)
   autoReply Boolean @default(false)

@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
 
   // Marketplace item(s) purchase fulfillment
   if (type === "marketplace") {
-    const { listingId, listingIds } = stripeSession.metadata ?? {};
+    const { listingId, listingIds, source, networkId } = stripeSession.metadata ?? {};
     const ids = (listingIds ? listingIds.split(",") : [listingId]).filter(Boolean);
     for (const id of ids) {
       await prisma.marketplacePurchase.upsert({
@@ -124,8 +124,14 @@ export async function POST(req: NextRequest) {
           listingId: id,
           price: Number(stripeSession.amount_total ? (stripeSession.amount_total / 100) / ids.length : 0),
           stripeSessionId: stripeSession.id,
+          source: source || "MARKETPLACE",
+          networkId: networkId || null,
         },
-        update: { stripeSessionId: stripeSession.id },
+        update: {
+          stripeSessionId: stripeSession.id,
+          source: source || "MARKETPLACE",
+          networkId: networkId || null,
+        },
       }).catch(() => {});
 
       const listing = await prisma.marketplaceListing.findUnique({ where: { id }, select: { title: true } });

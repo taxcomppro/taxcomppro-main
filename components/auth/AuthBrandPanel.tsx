@@ -39,11 +39,11 @@ export default function AuthBrandPanel() {
         <Link href="/" className="inline-block">
           <Image
             src="/logo_dark.webp"
-            alt="TaxCompPro"
-            width={168}
-            height={56}
+            alt="Tax Compliance Pro"
+            width={240}
+            height={70}
             className="object-contain"
-            style={{ width: "168px", height: "auto" }}
+            style={{ width: "240px", height: "auto", maxHeight: "70px" }}
             priority
           />
         </Link>

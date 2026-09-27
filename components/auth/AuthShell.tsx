@@ -18,20 +18,20 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             <Link href="/">
               <Image
                 src="/logo.webp"
-                alt="TaxCompPro"
-                width={150}
-                height={52}
+                alt="Tax Compliance Pro"
+                width={220}
+                height={65}
                 className="object-contain dark:hidden"
-                style={{ width: "150px", height: "auto" }}
+                style={{ width: "220px", height: "auto", maxHeight: "65px" }}
                 priority
               />
               <Image
                 src="/logo_dark.webp"
-                alt="TaxCompPro"
-                width={150}
-                height={52}
+                alt="Tax Compliance Pro"
+                width={220}
+                height={65}
                 className="hidden object-contain dark:block"
-                style={{ width: "150px", height: "auto" }}
+                style={{ width: "220px", height: "auto", maxHeight: "65px" }}
                 priority
               />
             </Link>
