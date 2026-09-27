@@ -29,7 +29,7 @@
 .site-footer .site-footer-cta:hover { background: #ffcb4d; }
 .site-footer-directory { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 64px; padding: 48px 0; }
 .site-footer-logo { display: inline-flex; }
-.site-footer-logo img { width: 160px; height: 64px; object-fit: contain; }
+.site-footer-logo img { width: 175px; height: auto; max-height: 56px; object-fit: contain; }
 .site-footer-logo-dark { display: none; }
 .dark .site-footer-logo-dark { display: block; }
 .dark .site-footer-logo-light { display: none; }

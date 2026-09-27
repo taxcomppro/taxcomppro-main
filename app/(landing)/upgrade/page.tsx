@@ -54,6 +54,7 @@ export default function UpgradePage() {
           code: data.code,
           discountType: data.discountType,
           discountValue: data.discountValue,
+          durationMonths: data.durationMonths,
           label: data.label,
           savings: data.savings,
         };

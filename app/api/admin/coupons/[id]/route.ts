@@ -30,6 +30,7 @@ export async function PATCH(
     discountType,
     discountValue,
     appliesTo,
+    durationMonths,
     maxUses,
     expiresAt,
     isActive,
@@ -73,9 +74,17 @@ export async function PATCH(
       });
       if (listing) {
         validListingId = listing.id;
+      } else {
+        validListingId = appliesTo;
       }
     }
     updateData.listingId = validListingId;
+  }
+
+  if (durationMonths !== undefined) {
+    updateData.durationMonths = durationMonths
+      ? Math.max(1, Math.min(120, parseInt(String(durationMonths), 10) || 1))
+      : 1;
   }
 
   if (maxUses !== undefined) {

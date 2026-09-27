@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
     discountType = "PERCENT",
     discountValue,
     appliesTo = "ALL",
+    durationMonths = 1,
     maxUses,
     expiresAt,
     isActive = true,
@@ -131,8 +132,15 @@ export async function POST(req: NextRequest) {
       });
       if (listing) {
         validListingId = listing.id;
+      } else {
+        // Keyword targets: "MEMBERSHIP", "COURSES", "TOOLKITS", "MARKETPLACE"
+        validListingId = appliesTo;
       }
     }
+
+    const parsedMonths = durationMonths
+      ? Math.max(1, Math.min(120, parseInt(String(durationMonths), 10) || 1))
+      : 1;
 
     const coupon = await prisma.marketplaceCoupon.create({
       data: {
@@ -141,6 +149,7 @@ export async function POST(req: NextRequest) {
         discountValue: numDiscount,
         sellerId: admin.user.id,
         listingId: validListingId,
+        durationMonths: parsedMonths,
         maxUses: maxUses ? parseInt(maxUses, 10) : null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         isActive: Boolean(isActive),

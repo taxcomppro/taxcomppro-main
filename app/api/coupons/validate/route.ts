@@ -253,16 +253,27 @@ export async function POST(req: NextRequest) {
     savings = Math.round(Math.min(basePrice, Math.max(0, savings)) * 100) / 100;
     const discountedPrice = Math.max(0, Math.round((basePrice - savings) * 100) / 100);
 
+    const months = coupon.durationMonths || 1;
+    let label = coupon.discountType === "PERCENT" ? `${coupon.discountValue}% OFF` : `$${coupon.discountValue} OFF`;
+    if (productCategory === "MEMBERSHIP" && months > 1) {
+      if (coupon.discountType === "PERCENT" && coupon.discountValue >= 100) {
+        label = `100% OFF (${months} Months Free)`;
+      } else {
+        label = `${label} (${months} Months)`;
+      }
+    }
+
     return NextResponse.json({
       valid: true,
       id: coupon.id,
       code: coupon.code,
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
+      durationMonths: months,
       originalPrice: basePrice,
       discountedPrice,
       savings,
-      label: coupon.discountType === "PERCENT" ? `${coupon.discountValue}% OFF` : `$${coupon.discountValue} OFF`,
+      label,
     });
   } catch (err: any) {
     console.error("Coupon validation error:", err);

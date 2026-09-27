@@ -303,7 +303,8 @@ model MarketplaceCoupon {
   expiresAt     DateTime?
   isActive      Boolean            @default(true)
   sellerId      String
-  listingId     String?            // null = all listings of seller
+  listingId     String?            // null = all listings of seller; "MEMBERSHIP", "COURSES", "TOOLKITS", etc.
+  durationMonths Int?              @default(1) // Duration in months for membership/subscription discounts (e.g. 1, 2, 3, 6, 12)
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 

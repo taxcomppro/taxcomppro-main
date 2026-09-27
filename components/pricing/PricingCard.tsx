@@ -12,6 +12,7 @@ export interface DiscountInfo {
   code: string;
   discountType: "PERCENT" | "FIXED";
   discountValue: number;
+  durationMonths?: number;
   label?: string;
   savings?: number;
 }
@@ -191,7 +192,11 @@ export function PricingCard({
           {hasDiscount && discountInfo ? (
             <span className="text-emerald-500 dark:text-emerald-400 font-bold">
               {finalPrice === 0
-                ? "🎉 100% Free with code " + discountInfo.code
+                ? discountInfo.durationMonths && discountInfo.durationMonths > 1
+                  ? `🎉 100% Free for ${discountInfo.durationMonths} Months with code ${discountInfo.code}`
+                  : `🎉 100% Free with code ${discountInfo.code}`
+                : discountInfo.durationMonths && discountInfo.durationMonths > 1
+                ? `Save $${discountSavings.toFixed(2)} (${discountInfo.durationMonths} Mo) with code ${discountInfo.code}`
                 : `Save $${discountSavings.toFixed(2)} with code ${discountInfo.code}`}
             </span>
           ) : (

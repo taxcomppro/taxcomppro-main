@@ -47,8 +47,9 @@
   position: relative;
 }
 .admin-sidebar header img {
-  width: 126px;
-  height: 48px;
+  width: auto;
+  max-width: 175px;
+  height: 46px;
   object-fit: contain;
   object-position: left;
 }

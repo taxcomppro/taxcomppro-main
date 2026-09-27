@@ -53,8 +53,21 @@ export async function POST(req: NextRequest) {
 
         // If 100% discount, grant membership upgrade immediately without Stripe checkout
         if (coupon.discountType === "PERCENT" && coupon.discountValue >= 100) {
-          const periodEnd = new Date();
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
+          const months = coupon.durationMonths && coupon.durationMonths > 0 ? coupon.durationMonths : 1;
+          const now = new Date();
+
+          const existingSub = await prisma.subscription.findUnique({
+            where: { userId: user.id },
+          });
+
+          let periodEnd: Date;
+          if (existingSub?.currentPeriodEnd && new Date(existingSub.currentPeriodEnd) > now) {
+            periodEnd = new Date(existingSub.currentPeriodEnd);
+            periodEnd.setMonth(periodEnd.getMonth() + months);
+          } else {
+            periodEnd = new Date();
+            periodEnd.setMonth(periodEnd.getMonth() + months);
+          }
 
           await prisma.user.update({
             where: { id: user.id },
@@ -81,12 +94,39 @@ export async function POST(req: NextRequest) {
             data: { usedCount: { increment: 1 } },
           });
 
+          await prisma.toolkitPurchase.create({
+            data: {
+              userId: user.id,
+              toolkitId: `promo_${coupon.code}`,
+              stripeSessionId: `promo_${coupon.code}_${Date.now()}`,
+              membershipGranted: true,
+              membershipTier: tier as any,
+              membershipMonths: months,
+            },
+          }).catch(err => console.error("[Checkout Coupon] Failed to record purchase:", err));
+
+          const formattedDate = periodEnd.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+
+          await prisma.notification.create({
+            data: {
+              userId: user.id,
+              type: "SYSTEM",
+              title: "🎉 Membership Upgraded!",
+              message: `You are now on the ${tier} plan for ${months} month${months > 1 ? "s" : ""} (valid until ${formattedDate}). Enjoy your benefits!`,
+            },
+          }).catch(err => console.error("[Checkout Coupon] Failed to send notification:", err));
+
           if (user.email) {
             sendMembershipUpgradedEmail({
               to: user.email,
               userName: user.name || "Member",
               tier,
               currentPeriodEnd: periodEnd,
+              months,
               isComplimentary: true,
             }).catch(err => console.error("[Checkout Coupon] Failed to send upgrade email:", err));
           }
@@ -125,10 +165,36 @@ export async function POST(req: NextRequest) {
     targetPath.includes("?") ? targetPath + "&" : targetPath + "?"
   }session_id={CHECKOUT_SESSION_ID}`;
 
+  let discountsParam: Array<{ coupon?: string; promotion_code?: string }> | undefined = undefined;
+  if (appliedCoupon) {
+    try {
+      const months = appliedCoupon.durationMonths && appliedCoupon.durationMonths > 0 ? appliedCoupon.durationMonths : 1;
+      const stripeCouponId = `PROMO_${appliedCoupon.code}_${appliedCoupon.discountType}_${appliedCoupon.discountValue}_${months}M`;
+      let stripeCoupon;
+      try {
+        stripeCoupon = await stripe.coupons.retrieve(stripeCouponId);
+      } catch {
+        const duration = months > 1 ? "repeating" : "once";
+        stripeCoupon = await stripe.coupons.create({
+          id: stripeCouponId,
+          name: `${appliedCoupon.code} (${appliedCoupon.discountValue}${appliedCoupon.discountType === "PERCENT" ? "%" : "$"} OFF - ${months} mo)`,
+          duration,
+          ...(duration === "repeating" ? { duration_in_months: months } : {}),
+          ...(appliedCoupon.discountType === "PERCENT"
+            ? { percent_off: appliedCoupon.discountValue }
+            : { amount_off: Math.round(appliedCoupon.discountValue * 100), currency: "usd" }),
+        });
+      }
+      discountsParam = [{ coupon: stripeCoupon.id }];
+    } catch (stripeErr) {
+      console.warn("Could not sync Stripe coupon, falling back to allow_promotion_codes:", stripeErr);
+    }
+  }
+
   const checkoutSession = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
-    allow_promotion_codes: true,
+    ...(discountsParam ? { discounts: discountsParam } : { allow_promotion_codes: true }),
     phone_number_collection: { enabled: true },
     payment_method_types: ["card"],
     ...(dub.clientReferenceId ? { client_reference_id: dub.clientReferenceId } : {}),

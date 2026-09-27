@@ -30,6 +30,7 @@ import {
   Package,
   Users,
   ShieldAlert,
+  Clock,
 } from "lucide-react";
 
 interface Coupon {
@@ -37,6 +38,7 @@ interface Coupon {
   code: string;
   discountType: "PERCENT" | "FIXED";
   discountValue: number;
+  durationMonths?: number | null;
   maxUses: number | null;
   usedCount: number;
   expiresAt: string | null;
@@ -101,6 +103,7 @@ export default function AdminCouponsPage() {
   const [discountType, setDiscountType] = useState<"PERCENT" | "FIXED">("PERCENT");
   const [discountValue, setDiscountValue] = useState("");
   const [appliesTo, setAppliesTo] = useState("ALL");
+  const [durationMonths, setDurationMonths] = useState("1");
   const [maxUses, setMaxUses] = useState("");
   const [isUnlimitedUses, setIsUnlimitedUses] = useState(true);
   const [expiresAt, setExpiresAt] = useState("");
@@ -146,6 +149,7 @@ export default function AdminCouponsPage() {
     setDiscountType("PERCENT");
     setDiscountValue("");
     setAppliesTo("ALL");
+    setDurationMonths("1");
     setMaxUses("");
     setIsUnlimitedUses(true);
     setExpiresAt("");
@@ -161,6 +165,7 @@ export default function AdminCouponsPage() {
     setDiscountType(coupon.discountType);
     setDiscountValue(String(coupon.discountValue));
     setAppliesTo(coupon.listingId || "ALL");
+    setDurationMonths(coupon.durationMonths != null ? String(coupon.durationMonths) : "1");
     setMaxUses(coupon.maxUses != null ? String(coupon.maxUses) : "");
     setIsUnlimitedUses(coupon.maxUses == null);
     setExpiresAt(coupon.expiresAt ? coupon.expiresAt.split("T")[0] : "");
@@ -197,6 +202,12 @@ export default function AdminCouponsPage() {
       return;
     }
 
+    const parsedDuration = parseInt(durationMonths, 10);
+    if ((appliesTo === "MEMBERSHIP" || appliesTo === "ALL") && (isNaN(parsedDuration) || parsedDuration < 1 || parsedDuration > 120)) {
+      setModalError("Please select or enter a valid duration between 1 and 120 months.");
+      return;
+    }
+
     setSaving(true);
 
     const payload = {
@@ -204,6 +215,7 @@ export default function AdminCouponsPage() {
       discountType,
       discountValue: val,
       appliesTo,
+      durationMonths: isNaN(parsedDuration) || parsedDuration < 1 ? 1 : parsedDuration,
       maxUses: isUnlimitedUses ? null : maxUses ? parseInt(maxUses, 10) : null,
       expiresAt: isNeverExpires ? null : expiresAt ? new Date(expiresAt).toISOString() : null,
       isActive,
@@ -545,22 +557,37 @@ export default function AdminCouponsPage() {
 
                     {/* Discount Column */}
                     <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1 font-bold px-2.5 py-1 rounded-full text-xs ${
-                          c.discountType === "PERCENT"
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                            : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                        }`}
-                      >
-                        {c.discountType === "PERCENT" ? <Percent className="w-3 h-3" /> : <DollarSign className="w-3 h-3" />}
-                        <span>{c.discountType === "PERCENT" ? `${c.discountValue}% OFF` : `$${c.discountValue.toFixed(2)} OFF`}</span>
-                      </span>
+                      <div className="flex flex-col items-start gap-1">
+                        <span
+                          className={`inline-flex items-center gap-1 font-bold px-2.5 py-1 rounded-full text-xs ${
+                            c.discountType === "PERCENT"
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                              : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                          }`}
+                        >
+                          {c.discountType === "PERCENT" ? <Percent className="w-3 h-3" /> : <DollarSign className="w-3 h-3" />}
+                          <span>{c.discountType === "PERCENT" ? `${c.discountValue}% OFF` : `$${c.discountValue.toFixed(2)} OFF`}</span>
+                        </span>
+                        {c.discountType === "PERCENT" && c.discountValue >= 100 && (
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                            🎁 100% Free Pass
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Scope / Seller Column */}
                     <td className="px-5 py-4">
                       {mainTab === "ADMIN_PROMOS" ? (
-                        <span className="font-semibold text-slate-200">{appliesLabel}</span>
+                        <div>
+                          <div className="font-semibold text-slate-200">{appliesLabel}</div>
+                          {(c.listingId === "MEMBERSHIP" || c.listingId === "UPGRADE" || !c.listingId || c.listingId === "ALL") && (
+                            <div className="text-[11px] text-amber-400/90 font-medium mt-0.5 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-400" />
+                              <span>{c.durationMonths || 1} Month{(c.durationMonths || 1) > 1 ? "s" : ""} Duration</span>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div>
                           <div className="font-semibold text-white">{c.seller?.name || "Seller"}</div>
@@ -775,6 +802,91 @@ export default function AdminCouponsPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Membership / Subscription Duration (Months) */}
+              {(appliesTo === "MEMBERSHIP" || appliesTo === "ALL") && (
+                <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 rounded-2xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-300 text-xs">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Membership Duration (Months)</span>
+                    </div>
+                    <span className="text-[11px] font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      {durationMonths} {Number(durationMonths) === 1 ? "Month" : "Months"}
+                    </span>
+                  </div>
+
+                  {/* Preset Duration Buttons */}
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {[
+                      { value: "1", label: "1 Mo" },
+                      { value: "2", label: "2 Mo" },
+                      { value: "3", label: "3 Mo" },
+                      { value: "6", label: "6 Mo" },
+                      { value: "12", label: "1 Year" },
+                      { value: "CUSTOM", label: "Custom" },
+                    ].map((preset) => {
+                      const isSelected =
+                        preset.value === "CUSTOM"
+                          ? !["1", "2", "3", "6", "12"].includes(String(durationMonths))
+                          : String(durationMonths) === preset.value;
+                      return (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => {
+                            if (preset.value === "CUSTOM") {
+                              if (["1", "2", "3", "6", "12"].includes(String(durationMonths))) {
+                                setDurationMonths("4");
+                              }
+                            } else {
+                              setDurationMonths(preset.value);
+                            }
+                          }}
+                          className={`py-1.5 px-1 rounded-xl text-[11px] font-bold border transition-all cursor-pointer text-center ${
+                            isSelected
+                              ? "bg-amber-500 text-slate-950 border-amber-400 shadow-sm shadow-amber-500/30"
+                              : "bg-[#060f1e]/80 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white"
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Custom Input when custom is active */}
+                  {!["1", "2", "3", "6", "12"].includes(String(durationMonths)) && (
+                    <div className="pt-1 flex items-center gap-2">
+                      <label className="text-slate-400 text-[11px] whitespace-nowrap">Enter Duration (1 - 120 Months):</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="120"
+                        value={durationMonths}
+                        onChange={(e) => setDurationMonths(e.target.value)}
+                        placeholder="e.g. 4"
+                        required
+                        className="w-24 bg-[#060f1e] text-slate-100 text-xs px-2.5 py-1.5 border border-amber-500/40 rounded-xl outline-none focus:border-amber-400 font-mono font-bold"
+                      />
+                      <span className="text-[11px] text-slate-400">months</span>
+                    </div>
+                  )}
+
+                  {/* Informative helper callout */}
+                  <div className="text-[11px] leading-relaxed bg-[#060f1e]/80 rounded-xl p-2.5 border border-amber-500/20">
+                    {discountType === "PERCENT" && Number(discountValue) >= 100 ? (
+                      <p className="text-emerald-400 font-medium">
+                        ✨ <strong>100% OFF</strong>: Directly grants <strong>{durationMonths || 1} month{Number(durationMonths) > 1 ? "s" : ""}</strong> of VIP/Platform membership without requiring credit card checkout.
+                      </p>
+                    ) : (
+                      <p className="text-slate-300">
+                        🎟️ Applies <strong>{discountValue || 0}{discountType === "PERCENT" ? "%" : "$"} off</strong> for <strong>{durationMonths || 1} month{Number(durationMonths) > 1 ? "s" : ""}</strong> of membership billing.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Usage Limit */}
               <div>
