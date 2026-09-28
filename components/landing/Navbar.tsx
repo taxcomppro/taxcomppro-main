@@ -365,7 +365,7 @@ export default function Navbar() {
             aria-label="Tax Compliance Pro home"
           >
             <Image
-              src="/logo.webp"
+              src="/Tonique_blanchard_upscale_upscaled (1).png"
               alt="Tax Compliance Pro"
               width={220}
               height={70}
@@ -373,7 +373,7 @@ export default function Navbar() {
               priority
             />
             <Image
-              src="/logo_dark.webp"
+              src="/logo_dark 1.webp"
               alt="Tax Compliance Pro"
               width={220}
               height={70}

@@ -114,8 +114,17 @@ export default function AdminShell({
       )}
       <aside className={`admin-sidebar ${open ? "is-open" : ""}`}>
         <header>
-          <Link href="/admin">
-            <img src="/logo_dark.webp" alt="Tax Compliance Pro" />
+          <Link href="/admin" className="admin-brand-logo">
+            <img
+              src="/Tonique_blanchard_upscale_upscaled (1).png"
+              alt="Tax Compliance Pro"
+              className="admin-logo-light"
+            />
+            <img
+              src="/logo_dark 1.webp"
+              alt="Tax Compliance Pro"
+              className="admin-logo-dark"
+            />
           </Link>
           <span>ADMIN WORKSPACE</span>
           <button

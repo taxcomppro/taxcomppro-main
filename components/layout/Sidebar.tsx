@@ -131,7 +131,7 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             <>
               <div>
                 <Link href="/" className="flex items-center gap-2">
-                  <img src="/logo_dark.webp" alt="Tax Compliance Pro" className="h-12 w-auto max-w-[200px] object-contain" />
+                  <img src="/logo_dark 1.webp" alt="Tax Compliance Pro" className="h-12 w-auto max-w-[200px] object-contain" />
                 </Link>
                 {isAdmin && (
                   <div className="mt-2.5 inline-flex items-center gap-1.5 bg-amber-400/15 text-amber-300 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full w-fit">

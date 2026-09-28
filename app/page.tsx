@@ -604,7 +604,7 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
             <div>
               <Link href="/" className="inline-block mb-4">
-                <img src="/logo_dark.webp" alt="Tax Compliance Pro" className="h-16 w-auto max-w-[240px] object-contain" />
+                <img src="/logo_dark 1.webp" alt="Tax Compliance Pro" className="h-16 w-auto max-w-[240px] object-contain" />
               </Link>
               <p className="text-white/45 text-sm leading-relaxed">The professional community for tax experts across America.</p>
             </div>

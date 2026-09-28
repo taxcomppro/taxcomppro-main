@@ -17,7 +17,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           <div className="mb-9 flex justify-center lg:hidden">
             <Link href="/">
               <Image
-                src="/logo.webp"
+                src="/Tonique_blanchard_upscale_upscaled (1).png"
                 alt="Tax Compliance Pro"
                 width={220}
                 height={65}
@@ -26,7 +26,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
                 priority
               />
               <Image
-                src="/logo_dark.webp"
+                src="/logo_dark 1.webp"
                 alt="Tax Compliance Pro"
                 width={220}
                 height={65}

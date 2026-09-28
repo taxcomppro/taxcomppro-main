@@ -24,7 +24,7 @@ export default function VerifyCertificatePage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <Link href="/"><Image src="/logo.webp" alt="Tax Compliance Pro" width={200} height={60} className="object-contain" style={{ width: "200px", height: "auto", maxHeight: "60px" }} loading="eager" /></Link>
+          <Link href="/"><Image src="/Tonique_blanchard_upscale_upscaled (1).png" alt="Tax Compliance Pro" width={200} height={60} className="object-contain" style={{ width: "200px", height: "auto", maxHeight: "60px" }} loading="eager" /></Link>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-8 text-center">
           {result === null ? (

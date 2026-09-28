@@ -187,7 +187,7 @@ export default function ForgotPasswordPage() {
         <div className="flex justify-center mb-8">
           <Link href="/">
             <Image
-              src="/logo.webp"
+              src="/Tonique_blanchard_upscale_upscaled (1).png"
               alt="Tax Compliance Pro"
               width={220}
               height={65}
@@ -196,7 +196,7 @@ export default function ForgotPasswordPage() {
               loading="eager"
             />
             <Image
-              src="/logo_dark.webp"
+              src="/logo_dark 1.webp"
               alt="Tax Compliance Pro"
               width={220}
               height={65}

@@ -39,8 +39,8 @@ export default function PublicFooter() {
         <div className="site-footer-directory">
           <div className="site-footer-brand">
             <Link href="/" aria-label="Tax Compliance Pro home" className="site-footer-logo">
-              <Image src="/logo.webp" alt="Tax Compliance Pro" width={240} height={80} className="site-footer-logo-light" />
-              <Image src="/logo_dark.webp" alt="Tax Compliance Pro" width={240} height={80} className="site-footer-logo-dark" />
+              <Image src="/Tonique_blanchard_upscale_upscaled (1).png" alt="Tax Compliance Pro" width={240} height={80} className="site-footer-logo-light" />
+              <Image src="/logo_dark 1.webp" alt="Tax Compliance Pro" width={240} height={80} className="site-footer-logo-dark" />
             </Link>
             <p>The professional community for tax experts across America.</p>
             <Link href="/contact" className="site-footer-contact">Let’s connect <ArrowUpRight01Icon size={18} aria-hidden="true" /></Link>

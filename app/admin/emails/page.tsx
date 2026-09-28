@@ -426,7 +426,7 @@ export default function AdminEmailsPage() {
       <body>
         <div class="container">
           <div class="header">
-            <img src="/logo_dark.webp" alt="Tax Compliance Pro" style="height:36px;width:auto;display:inline-block;" />
+            <img src="/logo_dark 1.webp" alt="Tax Compliance Pro" style="height:36px;width:auto;display:inline-block;" />
           </div>
           <div class="body-content">
             <h1>${heading}</h1>

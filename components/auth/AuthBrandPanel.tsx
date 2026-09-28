@@ -38,7 +38,7 @@ export default function AuthBrandPanel() {
       <div className="relative z-10">
         <Link href="/" className="inline-block">
           <Image
-            src="/logo_dark.webp"
+            src="/logo_dark 1.webp"
             alt="Tax Compliance Pro"
             width={240}
             height={70}
