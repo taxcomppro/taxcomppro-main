@@ -124,6 +124,151 @@ export async function POST(req: NextRequest) {
       }).catch(err => console.error("[Stripe Webhook] Admin purchase alert error:", err));
     }
 
+    // ── Ticketed Pro Talk Ticket Purchase ────────────────────────
+    if (type === "space_ticket" && userId) {
+      const { spaceId, customerEmail, customerName, ticketPrice } = session.metadata ?? {};
+      if (spaceId) {
+        const existingTicket = await prisma.spaceTicket.findUnique({
+          where: { stripeSessionId: session.id },
+        });
+
+        if (!existingTicket) {
+          const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+          let randomPart = "";
+          for (let i = 0; i < 4; i++) {
+            randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          const ticketNumber = `TKT-${Date.now().toString().slice(-5)}-${randomPart}`;
+          const pricePaid = (session.amount_total ?? 0) / 100;
+
+          await prisma.spaceTicket.create({
+            data: {
+              spaceId,
+              userId,
+              ticketNumber,
+              pricePaid: pricePaid || Number(ticketPrice || 0),
+              stripeSessionId: session.id,
+              stripePaymentIntentId:
+                typeof session.payment_intent === "string"
+                  ? session.payment_intent
+                  : (session.payment_intent as any)?.id || null,
+              paymentStatus: "PAID",
+              status: "CONFIRMED",
+              customerName: customerName || session.customer_details?.name || "Member",
+              customerEmail: customerEmail || session.customer_details?.email || "",
+            },
+          });
+
+          const space = await prisma.space.update({
+            where: { id: spaceId },
+            data: { ticketsSold: { increment: 1 } },
+            select: { name: true, hostId: true },
+          });
+
+          await prisma.spaceRsvp.upsert({
+            where: { spaceId_userId: { spaceId, userId } },
+            create: {
+              spaceId,
+              userId,
+              name: customerName || "Member",
+              email: customerEmail || "",
+            },
+            update: {},
+          });
+
+          await prisma.notification.create({
+            data: {
+              userId,
+              type: "SYSTEM",
+              title: "🎟️ Pro Talk Ticket Confirmed!",
+              message: `Your ticket (${ticketNumber}) for "${space.name}" is confirmed.`,
+              link: `/pro-talks/${spaceId}`,
+            },
+          }).catch(() => {});
+
+          if (space.hostId) {
+            await prisma.notification.create({
+              data: {
+                userId: space.hostId,
+                type: "SYSTEM",
+                title: "💰 Pro Talk Ticket Sold!",
+                message: `A new ticket was purchased for "${space.name}".`,
+                link: `/pro-talks/${spaceId}`,
+              },
+            }).catch(() => {});
+          }
+
+          await notifyAdminPurchase({
+            userId,
+            itemType: "space_ticket",
+            itemName: `Pro Talk Ticket: ${space.name} (${ticketNumber})`,
+            amountTotal: session.amount_total,
+            currency: session.currency,
+            stripeSessionId: session.id,
+            metadata: session.metadata,
+            customerEmail: session.customer_details?.email,
+            customerName: session.customer_details?.name,
+          }).catch((err) => console.error("[Stripe Webhook] Admin purchase alert error:", err));
+        }
+      }
+    }
+
+    // ── Pro Talk Ticket Capacity Boost Pack ────────────────────
+    if (type === "space_capacity_pack" && userId) {
+      const { spaceId, additionalSeats, packKey, pricePaid } = session.metadata ?? {};
+      if (spaceId) {
+        const existingOrder = await prisma.spaceCapacityOrder.findUnique({
+          where: { stripeSessionId: session.id },
+        });
+
+        if (!existingOrder) {
+          const seatsCount = Number(additionalSeats || 25);
+          await prisma.spaceCapacityOrder.create({
+            data: {
+              spaceId,
+              hostId: userId,
+              packKey: packKey || "PACK_25",
+              additionalSeats: seatsCount,
+              pricePaid: Number(pricePaid || (session.amount_total ?? 0) / 100),
+              stripeSessionId: session.id,
+              status: "COMPLETED",
+            },
+          });
+
+          const space = await prisma.space.update({
+            where: { id: spaceId },
+            data: {
+              ticketCapacity: { increment: seatsCount },
+              bonusTicketCapacity: { increment: seatsCount },
+            },
+            select: { name: true, ticketCapacity: true },
+          });
+
+          await prisma.notification.create({
+            data: {
+              userId,
+              type: "SYSTEM",
+              title: "🚀 Ticket Capacity Boosted!",
+              message: `+${seatsCount} ticket capacity added to "${space.name}". Total capacity: ${space.ticketCapacity} tickets.`,
+              link: `/pro-talks/${spaceId}`,
+            },
+          }).catch(() => {});
+
+          await notifyAdminPurchase({
+            userId,
+            itemType: "space_capacity_pack",
+            itemName: `Capacity Boost: +${seatsCount} for ${space.name}`,
+            amountTotal: session.amount_total,
+            currency: session.currency,
+            stripeSessionId: session.id,
+            metadata: session.metadata,
+            customerEmail: session.customer_details?.email,
+            customerName: session.customer_details?.name,
+          }).catch((err) => console.error("[Stripe Webhook] Admin capacity alert error:", err));
+        }
+      }
+    }
+
     // ── Marketplace item purchase ──────────────────────────
     if (type === "marketplace" && userId) {
       const { listingId, listingIds } = session.metadata ?? {};

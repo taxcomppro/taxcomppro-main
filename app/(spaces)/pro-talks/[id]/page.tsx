@@ -1,14 +1,36 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Fragment, useEffect, useState, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Loader2, Calendar, Clock, Users, Check, CheckCheck, Copy, Play, Pencil } from "lucide-react";
+import {
+  Loader2,
+  Calendar,
+  Clock,
+  Users,
+  Check,
+  CheckCheck,
+  Copy,
+  Play,
+  Pencil,
+  Ticket,
+  DollarSign,
+  Sparkles,
+  Building2,
+  ShieldCheck,
+  BarChart3,
+  AlertCircle,
+  Video,
+  Mic,
+  Lock,
+} from "lucide-react";
 import { Radio01Icon } from "hugeicons-react";
 import SpaceRoom from "@/components/spaces/SpaceRoom";
 import RsvpPanel from "@/components/spaces/RsvpPanel";
 import EditTalkDialog from "@/components/spaces/EditTalkDialog";
+import HostTicketSalesModal from "@/components/spaces/HostTicketSalesModal";
+import { isTicketedSpace } from "@/lib/ticketedProTalks";
 import { accountUrl } from "@/lib/auth-navigation";
 import "./talk-room.css";
 
@@ -28,6 +50,21 @@ interface Space {
   roomName: string;
   category?: string;
   mediaType?: string;
+  accessType?: "FREE" | "PRIVATE" | "PAID";
+  ticketPrice?: number | null;
+  ticketCapacity?: number | null;
+  ticketsSold?: number;
+  ticketsRemaining?: number;
+  hasTicket?: boolean;
+  ticketNumber?: string | null;
+  salesClosedEarly?: boolean;
+  salesStartsAt?: string | null;
+  salesEndsAt?: string | null;
+  refundPolicy?: string | null;
+  refundUntil?: string | null;
+  whatIsIncluded?: string[] | null;
+  isNetworkExclusive?: boolean;
+  network?: { id: string; name: string; slug: string } | null;
   isLive: boolean;
   scheduledAt: string | null;
   shareToken: string | null;
@@ -72,148 +109,201 @@ function useCountdown(target: string | null) {
 function Countdown({ target }: { target: string | null }) {
   const { d, h, m, s, expired } = useCountdown(target);
   if (expired) return <p className="ptr-soon">Starting any moment — the host is opening the stage.</p>;
-  const units = [...(d > 0 ? [{ v: d, l: "days" }] : []), { v: h, l: "hrs" }, { v: m, l: "min" }, { v: s, l: "sec" }];
+  const units = [
+    ...(d > 0 ? [{ v: d, l: "days" }] : []),
+    { v: h, l: "hrs" },
+    { v: m, l: "min" },
+    { v: s, l: "sec" },
+  ];
   return (
     <div className="ptr-countdown" role="timer" aria-label="Time until this Pro Talk starts">
       {units.map((u, i) => (
         <Fragment key={u.l}>
           {i > 0 && <i aria-hidden="true">:</i>}
-          <div><strong>{String(u.v).padStart(2, "0")}</strong><small>{u.l}</small></div>
+          <div>
+            <strong>{String(u.v).padStart(2, "0")}</strong>
+            <small>{u.l}</small>
+          </div>
         </Fragment>
       ))}
     </div>
   );
 }
 
-// ── Guest Join Screen ──────────────────────────────────────────────────────────
-function GuestJoinScreen({
+// ── Ticket Purchase Showcase Screen ───────────────────────────────────────────
+function TicketedPurchaseScreen({
   space,
-  onJoin,
+  currentUserId,
+  onBuyTicket,
+  buying,
 }: {
   space: Space;
-  onJoin: (displayName: string) => void;
+  currentUserId: string;
+  onBuyTicket: () => void;
+  buying: boolean;
 }) {
-  const [name, setName] = useState("");
-  const [joining, setJoining] = useState(false);
-  const handleJoin = () => {
-    if (!name.trim() || joining) return;
-    setJoining(true);
-    onJoin(name.trim());
-  };
   const isVideo = space.mediaType === "AUDIO_VIDEO";
+  const price = space.ticketPrice || 0;
+  const isSoldOut = typeof space.ticketsRemaining === "number" && space.ticketsRemaining <= 0;
+  const isClosed = Boolean(space.salesClosedEarly);
 
   return (
-    <main className="ptr-screen">
-      <Link href="/pro-talks" className="ptr-back">← Pro Talks</Link>
-      <span className="ptr-status is-live"><span className="ptr-dot" /> Live now</span>
-      <span className="ptr-mic"><Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" /></span>
-      <h1>{space.name}</h1>
-      {space.description && <p className="ptr-desc">{space.description}</p>}
-      <div className="ptr-meta">
-        <span>Hosted by <strong>{space.host.name}</strong></span>
-        {space.category && <span>{space.category}</span>}
-        <span>{isVideo ? "Audio + video" : "Audio only"}</span>
-      </div>
-      <form className="ptr-join" onSubmit={e => { e.preventDefault(); handleJoin(); }}>
-        <label htmlFor="guest-name-input">Your display name</label>
-        <input
-          id="guest-name-input"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="How should others see you?"
-          maxLength={40}
-          autoComplete="name"
-        />
-        <button id="guest-join-btn" type="submit" disabled={!name.trim() || joining} className="ptr-btn ptr-btn--primary">
-          {joining ? <><Loader2 className="w-4 h-4 animate-spin" /> Joining…</> : <><Radio01Icon className="w-4 h-4" /> Join Pro Talk</>}
-        </button>
-      </form>
-      <div className="flex items-center justify-center gap-3 text-xs text-slate-400 mt-1">
-        <span>Have an account?</span>
-        <Link href={accountUrl("/login", `/pro-talks/${space.id}`)} className="text-lime-400 font-bold hover:underline">
-          Sign In
-        </Link>
-        <span>·</span>
-        <Link href={accountUrl("/register", `/pro-talks/${space.id}`)} className="text-emerald-400 font-bold hover:underline">
-          Sign Up
-        </Link>
-      </div>
-      <p className="ptr-fine">Free to join · you&apos;ll enter muted</p>
-    </main>
-  );
-}
+    <main className="ptr-screen max-w-2xl text-left">
+      <Link href="/pro-talks" className="ptr-back">
+        &larr; Pro Talks
+      </Link>
 
-
-// ── Exit Screen Component ─────────────────────────────────────────────────────
-function ExitScreen({
-  space,
-  onExit,
-}: {
-  space: Space;
-  onExit: () => void;
-}) {
-  const [seconds, setSeconds] = useState(4);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setSeconds((s) => {
-        if (s <= 1) {
-          clearInterval(timer);
-          onExit();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [onExit]);
-
-  return (
-    <main className="ptr-screen" style={{ textAlign: "center", maxWidth: "480px" }}>
-      <span className="ptr-mic">
-        <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" priority />
-      </span>
-      <span
-        className="ptr-status"
-        style={{
-          background: "rgba(244,63,94,0.15)",
-          borderColor: "rgba(244,63,94,0.3)",
-          color: "#fda4af",
-        }}
-      >
-        Pro Talk Concluded
-      </span>
-      <h1 style={{ fontSize: "24px", marginTop: "12px", marginBottom: "8px" }}>
-        {space.name}
-      </h1>
-      <p className="ptr-desc" style={{ marginBottom: "20px" }}>
-        This Pro Talk session has ended. Thank you for participating in the conversation!
-      </p>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "8px",
-          fontSize: "13px",
-          color: "#94a3b8",
-          background: "rgba(255,255,255,0.05)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: "14px",
-          padding: "10px 16px",
-          marginBottom: "24px",
-        }}
-      >
-        <span>Returning to Pro Talks in</span>
-        <strong style={{ color: "#a3e635", fontSize: "16px", minWidth: "16px" }}>
-          {seconds}s
-        </strong>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className="px-3 py-1 rounded-full bg-gradient-to-r from-emerald-500/30 to-teal-500/25 border border-lime-400/60 text-lime-300 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-500/15">
+          <Ticket className="w-3.5 h-3.5" /> Ticketed Pro Talk
+        </span>
+        {space.isLive && (
+          <span className="ptr-status is-live !m-0">
+            <span className="ptr-dot" /> Live now
+          </span>
+        )}
+        {space.isNetworkExclusive && space.network && (
+          <span className="px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/40 text-lime-300 text-[11px] font-bold flex items-center gap-1">
+            <Building2 className="w-3 h-3" /> {space.network.name} Exclusive
+          </span>
+        )}
       </div>
 
-      <div className="ptr-actions" style={{ justifyContent: "center" }}>
-        <button onClick={onExit} className="ptr-btn ptr-btn--primary">
-          Return to Pro Talks Now
-        </button>
+      <div className="flex items-start gap-4 mb-4">
+        <span className="ptr-mic !m-0 !w-16 !h-16 shrink-0">
+          <Image src="/protalk.png" alt="" fill className="object-cover" sizes="64px" />
+        </span>
+        <div>
+          <h1 className="!text-2xl sm:!text-3xl !text-left font-black tracking-tight">{space.name}</h1>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 mt-2">
+            <span>
+              Hosted by <strong>{space.host.name}</strong>
+            </span>
+            {space.category && <span>&bull; {space.category}</span>}
+            <span>&bull; {isVideo ? "Audio + Video Stage" : "Audio Only Stage"}</span>
+          </div>
+        </div>
+      </div>
+
+      {space.description && (
+        <p className="ptr-desc !text-left text-slate-300 mb-5 leading-relaxed">{space.description}</p>
+      )}
+
+      {/* Date & Time if scheduled */}
+      {space.scheduledAt && !space.isLive && (
+        <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/25 flex items-center gap-3 mb-5">
+          <Clock className="w-5 h-5 text-lime-400 shrink-0" />
+          <div>
+            <div className="text-xs font-bold text-white uppercase tracking-wider">Scheduled Event</div>
+            <div className="text-sm font-semibold text-emerald-300">
+              {formatScheduled(space.scheduledAt)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket Price & Capacity Status Card */}
+      <div className="p-5 rounded-3xl bg-gradient-to-br from-[#06172d] to-[#030d1a] border border-emerald-500/35 mb-5 shadow-lg shadow-emerald-500/10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-emerald-500/20">
+          <div>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Admission Ticket
+            </span>
+            <div className="text-3xl font-black text-lime-300 mt-0.5">
+              ${price.toFixed(2)}{" "}
+              <span className="text-xs font-normal text-slate-400">USD</span>
+            </div>
+          </div>
+          <div className="sm:text-right">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Availability
+            </span>
+            <div className="text-sm font-black text-white mt-0.5">
+              {isSoldOut ? (
+                <span className="text-rose-400">Sold Out</span>
+              ) : isClosed ? (
+                <span className="text-amber-400">Sales Paused</span>
+              ) : (
+                <span className="text-emerald-300">
+                  {space.ticketsRemaining ?? 25} Tickets Remaining
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* What's Included */}
+        {Array.isArray(space.whatIsIncluded) && space.whatIsIncluded.length > 0 && (
+          <div className="pt-4">
+            <div className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-lime-400" /> What&apos;s Included
+            </div>
+            <ul className="space-y-2">
+              {space.whatIsIncluded.map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-xs text-slate-200">
+                  <Check className="w-4 h-4 text-lime-400 shrink-0 mt-0.5" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Refund Policy Note */}
+        <div className="mt-4 pt-3.5 border-t border-emerald-500/15 flex items-center gap-2 text-[11px] text-slate-400">
+          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            {space.refundPolicy === "REFUNDABLE_UNTIL_DATE" && space.refundUntil
+              ? `Refundable until ${new Date(space.refundUntil).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+              : "All ticket sales are final (No refunds)."}
+          </span>
+        </div>
+      </div>
+
+      {/* CTA Purchase Button */}
+      <div className="space-y-3">
+        {currentUserId ? (
+          <button
+            onClick={onBuyTicket}
+            disabled={buying || isSoldOut || isClosed}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-lime-400 via-emerald-400 to-teal-400 hover:from-lime-300 hover:to-emerald-300 text-[#04111f] font-black text-base shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 hover:scale-[1.01]"
+          >
+            {buying ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" /> Preparing Checkout…
+              </>
+            ) : isSoldOut ? (
+              "Event Sold Out"
+            ) : isClosed ? (
+              "Ticket Sales Closed"
+            ) : (
+              <>
+                <Ticket className="w-5 h-5" /> GET TICKET — ${price.toFixed(2)}
+              </>
+            )}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <Link
+              href={accountUrl("/register", `/pro-talks/${space.id}`)}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-lime-400 to-emerald-400 text-[#04111f] font-black text-base shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+            >
+              <Ticket className="w-5 h-5" /> Sign Up &amp; Get Ticket — ${price.toFixed(2)}
+            </Link>
+            <div className="text-center text-xs text-slate-400">
+              Already have an account?{" "}
+              <Link
+                href={accountUrl("/login", `/pro-talks/${space.id}`)}
+                className="text-lime-400 font-bold hover:underline"
+              >
+                Sign In
+              </Link>
+            </div>
+          </div>
+        )}
+        <p className="text-[11px] text-center text-slate-400">
+          Tickets are securely tied to your Tax Compliance Pro account with instant entry authorization.
+        </p>
       </div>
     </main>
   );
@@ -228,6 +318,7 @@ function ScheduledScreen({
   starting,
   onSpaceUpdated,
   onCancelled,
+  onOpenTicketDashboard,
 }: {
   space: Space;
   isHost: boolean;
@@ -236,12 +327,16 @@ function ScheduledScreen({
   starting: boolean;
   onSpaceUpdated: (updated: Space) => void;
   onCancelled: (id: string) => void;
+  onOpenTicketDashboard: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
   const [rsvped, setRsvped] = useState(false);
   const [rsvping, setRsvping] = useState(false);
   const [rsvpCount, setRsvpCount] = useState(space._count?.rsvps ?? 0);
   const [copied, setCopied] = useState(false);
+
+  const isPaid = isTicketedSpace(space);
+  const hasTicket = Boolean(space.hasTicket);
 
   const shareUrl = space.shareToken
     ? typeof window !== "undefined"
@@ -262,7 +357,7 @@ function ScheduledScreen({
     if (rsvped) {
       await fetch(`/api/spaces/${space.id}/rsvp`, { method: "DELETE" });
       setRsvped(false);
-      setRsvpCount(c => Math.max(0, c - 1));
+      setRsvpCount((c) => Math.max(0, c - 1));
     } else {
       const res = await fetch(`/api/spaces/${space.id}/rsvp`, {
         method: "POST",
@@ -271,7 +366,7 @@ function ScheduledScreen({
       });
       if (res.ok) {
         setRsvped(true);
-        setRsvpCount(c => c + 1);
+        setRsvpCount((c) => c + 1);
       }
     }
     setRsvping(false);
@@ -279,55 +374,113 @@ function ScheduledScreen({
 
   return (
     <main className="ptr-screen">
-      <Link href="/pro-talks" className="ptr-back">← Pro Talks</Link>
-      <span className="ptr-status is-up"><Calendar className="w-4 h-4" /> Scheduled Pro Talk</span>
-      <span className="ptr-mic"><Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" /></span>
+      <Link href="/pro-talks" className="ptr-back">
+        &larr; Pro Talks
+      </Link>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+        <span className="ptr-status is-up">
+          <Calendar className="w-4 h-4" /> Scheduled Pro Talk
+        </span>
+        {isPaid && (
+          <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-lime-300 text-xs font-black uppercase flex items-center gap-1">
+            <Ticket className="w-3.5 h-3.5" /> Ticketed Stage · ${(space.ticketPrice || 0).toFixed(2)}
+          </span>
+        )}
+      </div>
+
+      <span className="ptr-mic">
+        <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" />
+      </span>
       <h1>{space.name}</h1>
       {space.description && <p className="ptr-desc">{space.description}</p>}
+
       <div className="ptr-meta">
-        <span>Hosted by <strong>{space.host.name}</strong></span>
+        <span>
+          Hosted by <strong>{space.host.name}</strong>
+        </span>
         {space.category && <span>{space.category}</span>}
-        {space.scheduledAt && <span><Clock className="w-4 h-4" /> {formatScheduled(space.scheduledAt)}</span>}
-        {isHost && <span><Users className="w-4 h-4" /> {rsvpCount} {rsvpCount === 1 ? "person" : "people"} going</span>}
+        {space.scheduledAt && (
+          <span>
+            <Clock className="w-4 h-4" /> {formatScheduled(space.scheduledAt)}
+          </span>
+        )}
+        {isHost && (
+          <span>
+            <Users className="w-4 h-4" /> {rsvpCount} {rsvpCount === 1 ? "person" : "people"} going
+          </span>
+        )}
       </div>
+
+      {/* Ticket Confirmed Banner for Ticket Holders */}
+      {isPaid && hasTicket && (
+        <div className="my-4 px-4 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 text-lime-300 text-xs font-bold flex items-center justify-center gap-2">
+          <CheckCheck className="w-4 h-4 text-lime-400 shrink-0" />
+          <span>
+            Your Ticket Is Confirmed! Ticket #{space.ticketNumber || "CONFIRMED"} &bull; Stage opens at start time.
+          </span>
+        </div>
+      )}
 
       <Countdown target={space.scheduledAt} />
 
       <div className="ptr-actions">
         {isHost && (
           <>
-            <button id="host-start-now-btn" onClick={onStartNow} disabled={starting} className="ptr-btn ptr-btn--live">
-              {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
+            <button
+              id="host-start-now-btn"
+              onClick={onStartNow}
+              disabled={starting}
+              className="ptr-btn ptr-btn--live"
+            >
+              {starting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 fill-white" />
+              )}
               {starting ? "Starting stage…" : "Go live now"}
             </button>
-            <button id="host-edit-talk-btn" onClick={() => setShowEdit(true)} className="ptr-btn ptr-btn--ghost">
+
+            {isPaid && (
+              <button
+                onClick={onOpenTicketDashboard}
+                className="ptr-btn !bg-emerald-500/20 !border-emerald-400/50 !text-lime-300 hover:!bg-emerald-500/30"
+              >
+                <BarChart3 className="w-4 h-4" /> Ticket Sales Dashboard
+              </button>
+            )}
+
+            <button
+              id="host-edit-talk-btn"
+              onClick={() => setShowEdit(true)}
+              className="ptr-btn ptr-btn--ghost"
+            >
               <Pencil className="w-4 h-4" /> Edit Talk
             </button>
           </>
         )}
-        {currentUserId && !isHost && (
-          <button id="detail-rsvp-btn" onClick={toggleRsvp} disabled={rsvping} className={`ptr-btn ${rsvped ? "ptr-btn--ghost" : "ptr-btn--primary"}`}>
-            {rsvping ? <Loader2 className="w-4 h-4 animate-spin" /> : rsvped ? <><CheckCheck className="w-4 h-4" /> RSVP&apos;d</> : <><Check className="w-4 h-4" /> RSVP</>}
+
+        {currentUserId && !isHost && !isPaid && (
+          <button
+            id="detail-rsvp-btn"
+            onClick={toggleRsvp}
+            disabled={rsvping}
+            className={`ptr-btn ${rsvped ? "ptr-btn--ghost" : "ptr-btn--primary"}`}
+          >
+            {rsvping ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : rsvped ? (
+              <>
+                <CheckCheck className="w-4 h-4" /> RSVP&apos;d
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" /> RSVP
+              </>
+            )}
           </button>
         )}
-        {!currentUserId && (
-          <>
-            <Link
-              id="unauth-signup-rsvp-btn"
-              href={accountUrl("/register", `/pro-talks/${space.id}`)}
-              className="ptr-btn ptr-btn--primary"
-            >
-              <Radio01Icon className="w-4 h-4" /> Sign Up to RSVP &amp; Join
-            </Link>
-            <Link
-              id="unauth-signin-btn"
-              href={accountUrl("/login", `/pro-talks/${space.id}`)}
-              className="ptr-btn ptr-btn--ghost"
-            >
-              Sign In
-            </Link>
-          </>
-        )}
+
         {shareUrl && (
           <button onClick={copyLink} className="ptr-btn ptr-btn--ghost">
             {copied ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -336,7 +489,7 @@ function ScheduledScreen({
         )}
       </div>
 
-      {isHost && (
+      {isHost && !isPaid && (
         <section className="ptr-host" aria-label="Confirmed RSVPs">
           <p>Host · confirmed RSVPs</p>
           <RsvpPanel spaceId={space.id} />
@@ -356,9 +509,101 @@ function ScheduledScreen({
   );
 }
 
+// ── Guest Join Screen (Free Talks Only) ───────────────────────────────────────
+function GuestJoinScreen({
+  space,
+  onJoin,
+}: {
+  space: Space;
+  onJoin: (displayName: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [joining, setJoining] = useState(false);
+  const handleJoin = () => {
+    if (!name.trim() || joining) return;
+    setJoining(true);
+    onJoin(name.trim());
+  };
+  const isVideo = space.mediaType === "AUDIO_VIDEO";
+
+  return (
+    <main className="ptr-screen">
+      <Link href="/pro-talks" className="ptr-back">
+        &larr; Pro Talks
+      </Link>
+      <span className="ptr-status is-live">
+        <span className="ptr-dot" /> Live now
+      </span>
+      <span className="ptr-mic">
+        <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" />
+      </span>
+      <h1>{space.name}</h1>
+      {space.description && <p className="ptr-desc">{space.description}</p>}
+      <div className="ptr-meta">
+        <span>
+          Hosted by <strong>{space.host.name}</strong>
+        </span>
+        {space.category && <span>{space.category}</span>}
+        <span>{isVideo ? "Audio + video" : "Audio only"}</span>
+      </div>
+      <form
+        className="ptr-join"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleJoin();
+        }}
+      >
+        <label htmlFor="guest-name-input">Your display name</label>
+        <input
+          id="guest-name-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="How should others see you?"
+          maxLength={40}
+          autoComplete="name"
+        />
+        <button
+          id="guest-join-btn"
+          type="submit"
+          disabled={!name.trim() || joining}
+          className="ptr-btn ptr-btn--primary"
+        >
+          {joining ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Joining…
+            </>
+          ) : (
+            <>
+              <Radio01Icon className="w-4 h-4" /> Join Pro Talk
+            </>
+          )}
+        </button>
+      </form>
+      <div className="flex items-center justify-center gap-3 text-xs text-slate-400 mt-1">
+        <span>Have an account?</span>
+        <Link
+          href={accountUrl("/login", `/pro-talks/${space.id}`)}
+          className="text-lime-400 font-bold hover:underline"
+        >
+          Sign In
+        </Link>
+        <span>&bull;</span>
+        <Link
+          href={accountUrl("/register", `/pro-talks/${space.id}`)}
+          className="text-emerald-400 font-bold hover:underline"
+        >
+          Sign Up
+        </Link>
+      </div>
+      <p className="ptr-fine">Free to join &bull; you&apos;ll enter muted</p>
+    </main>
+  );
+}
+
 // ── Main Page Component ───────────────────────────────────────────────────────
 export default function ProTalkPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const router = useRouter();
 
   const [space, setSpace] = useState<Space | null>(null);
@@ -370,52 +615,90 @@ export default function ProTalkPage() {
   const [ending, setEnding] = useState(false);
   const [starting, setStarting] = useState(false);
   const [showGuestForm, setShowGuestForm] = useState(false);
-  const [showExitScreen, setShowExitScreen] = useState(false);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [buyingTicket, setBuyingTicket] = useState(false);
+  const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    if (!id) return;
+    try {
+      // Check if returning from Stripe ticket checkout
+      const ticketPaid = searchParams?.get("ticket_success") === "1";
+      const sessionId = searchParams?.get("session_id");
+
+      if (ticketPaid && sessionId) {
+        await fetch(`/api/spaces/${id}/confirm-ticket`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        }).catch(() => {});
+        setTicketSuccess(true);
+      }
+
+      const [spaceData, tokenData, me] = await Promise.all([
+        fetch(`/api/spaces/${id}`).then((r) => r.json()),
+        fetch(`/api/spaces/${id}/token`, { method: "POST" })
+          .then((r) => r.json())
+          .catch(() => ({ error: "Token unavailable" })),
+        fetch("/api/user/me")
+          .then((r) => r.json())
+          .catch(() => null),
+      ]);
+
+      if (spaceData.error) {
+        setError(spaceData.error);
+        return;
+      }
+      setSpace(spaceData as Space);
+
+      if (me?.id) {
+        setUserId(me.id);
+        setIsAdmin(me.role === "ADMIN");
+      }
+
+      if (tokenData.error) {
+        // Token error might be because user hasn't bought ticket, or not logged in
+        if (spaceData.isLive && !isTicketedSpace(spaceData) && !me?.id) {
+          setShowGuestForm(true);
+        }
+      } else {
+        setToken(tokenData.token as string);
+        fetch(`/api/spaces/${id}/attendance`, { method: "POST" }).catch(() => {});
+      }
+    } catch {
+      setError("Failed to load Pro Talk");
+    } finally {
+      setLoading(false);
+    }
+  }, [id, searchParams]);
 
   useEffect(() => {
-    if (!id) return;
-    let isCancelled = false;
-
-    async function fetchData() {
-      try {
-        const [spaceData, tokenData, me] = await Promise.all([
-          fetch(`/api/spaces/${id}`).then(r => r.json()),
-          fetch(`/api/spaces/${id}/token`, { method: "POST" }).then(r => r.json()),
-          fetch("/api/user/me").then(r => r.json()).catch(() => null),
-        ]);
-
-        if (isCancelled) return;
-
-        if (spaceData.error) {
-          setError(spaceData.error);
-          return;
-        }
-        setSpace(spaceData as Space);
-
-        if (me?.id) {
-          setUserId(me.id);
-          setIsAdmin(me.role === "ADMIN");
-        }
-
-        if (tokenData.error) {
-          if (spaceData.isLive && !me?.id) setShowGuestForm(true);
-        } else {
-          setToken(tokenData.token as string);
-          fetch(`/api/spaces/${id}/attendance`, { method: "POST" }).catch(() => {});
-        }
-      } catch {
-        if (!isCancelled) setError("Failed to load Pro Talk");
-      } finally {
-        if (!isCancelled) setLoading(false);
-      }
-    }
-
     fetchData();
+  }, [fetchData]);
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [id]);
+  const handleBuyTicket = async () => {
+    if (!id || buyingTicket) return;
+    if (!userId) {
+      router.push(accountUrl("/login", `/pro-talks/${id}`));
+      return;
+    }
+    setBuyingTicket(true);
+    try {
+      const res = await fetch(`/api/spaces/${id}/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Checkout unavailable");
+      }
+      window.location.href = data.url;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to initiate ticket checkout");
+      setBuyingTicket(false);
+    }
+  };
 
   const handleGuestJoin = async (displayName: string) => {
     setShowGuestForm(false);
@@ -481,58 +764,111 @@ export default function ProTalkPage() {
   if (loading) {
     return (
       <main className="ptr-screen ptr-loading" role="status">
-        <span className="ptr-mic"><Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" priority /></span>
+        <span className="ptr-mic">
+          <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" priority />
+        </span>
         <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
         <p>Connecting to the Pro Talk stage…</p>
       </main>
     );
   }
 
-  // Guest name form
-  if (showGuestForm && space) return <GuestJoinScreen space={space} onJoin={handleGuestJoin} />;
+  // Check if user is host, co-host, or admin
+  const isHost = Boolean(
+    space &&
+      userId &&
+      (space.hostId === userId ||
+        space.host?.id === userId ||
+        (Array.isArray(space.coHostIds) && space.coHostIds.includes(userId)) ||
+        isAdmin)
+  );
 
-    // Exit screen on conclusion
-  if (showExitScreen && space) {
-    return <ExitScreen space={space} onExit={() => router.push("/pro-talks")} />;
+  // If ticketed talk and attendee doesn't have a ticket yet (and is not host/co-host/admin)
+  if (space && isTicketedSpace(space) && !isHost && !space.hasTicket) {
+    return (
+      <TicketedPurchaseScreen
+        space={space}
+        currentUserId={userId}
+        onBuyTicket={handleBuyTicket}
+        buying={buyingTicket}
+      />
+    );
   }
 
-  // Scheduled screen
+  // Guest name form for public free live talks only
+  if (showGuestForm && space && !isTicketedSpace(space)) return <GuestJoinScreen space={space} onJoin={handleGuestJoin} />;
+
+  // Scheduled screen (both free and ticketed where user has ticket or is host)
   if (space && !space.isLive && !space.endedAt) {
-    const isHostUser = Boolean(userId && (space.hostId === userId || space.host?.id === userId));
     return (
-      <ScheduledScreen
-        space={space}
-        isHost={isHostUser}
-        currentUserId={userId}
-        onStartNow={handleStartNow}
-        starting={starting}
-        onSpaceUpdated={(updated) => setSpace(s => s ? { ...s, ...updated } : updated)}
-        onCancelled={() => router.push("/pro-talks")}
-      />
+      <>
+        <ScheduledScreen
+          space={space}
+          isHost={isHost}
+          currentUserId={userId}
+          onStartNow={handleStartNow}
+          starting={starting}
+          onSpaceUpdated={(updated) => setSpace((s) => (s ? { ...s, ...updated } : updated))}
+          onCancelled={() => router.push("/pro-talks")}
+          onOpenTicketDashboard={() => setShowTicketModal(true)}
+        />
+        {isTicketedSpace(space) && (
+          <HostTicketSalesModal
+            spaceId={space.id}
+            spaceName={space.name}
+            isOpen={showTicketModal}
+            onClose={() => setShowTicketModal(false)}
+            onCapacityUpdated={(newCap) =>
+              setSpace((s) => (s ? { ...s, ticketCapacity: newCap } : s))
+            }
+          />
+        )}
+      </>
     );
   }
 
   if (error || !space || !token) {
     return (
       <main className="ptr-screen">
-        <span className="ptr-mic"><Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" /></span>
+        <span className="ptr-mic">
+          <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" priority />
+        </span>
         <h1>{space?.endedAt ? "This Pro Talk has ended" : "Pro Talk unavailable"}</h1>
-        <p className="ptr-desc">{error && error !== "Not found" ? error : "It may have ended or the link is no longer valid. Browse what's live and upcoming instead."}</p>
+        <p className="ptr-desc">
+          {error && error !== "Not found"
+            ? error
+            : "It may have ended or the link is no longer valid. Browse what's live and upcoming instead."}
+        </p>
         <div className="ptr-actions">
-          <Link href="/pro-talks" className="ptr-btn ptr-btn--primary">Browse Pro Talks</Link>
+          <Link href="/pro-talks" className="ptr-btn ptr-btn--primary">
+            Browse Pro Talks
+          </Link>
         </div>
       </main>
     );
   }
 
   return (
-    <SpaceRoom
-      space={space}
-      token={token}
-      isAdmin={isAdmin}
-      userId={userId}
-      onEnd={handleEnd}
-      ending={ending}
-    />
+    <>
+      <SpaceRoom
+        space={space}
+        token={token}
+        isAdmin={isAdmin}
+        userId={userId}
+        onEnd={handleEnd}
+        ending={ending}
+      />
+      {isHost && isTicketedSpace(space) && (
+        <HostTicketSalesModal
+          spaceId={space.id}
+          spaceName={space.name}
+          isOpen={showTicketModal}
+          onClose={() => setShowTicketModal(false)}
+          onCapacityUpdated={(newCap) =>
+            setSpace((s) => (s ? { ...s, ticketCapacity: newCap } : s))
+          }
+        />
+      )}
+    </>
   );
 }

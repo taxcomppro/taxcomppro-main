@@ -15,7 +15,17 @@ import {
   Video01Icon,
   UserGroupIcon,
 } from "hugeicons-react";
+import {
+  Ticket,
+  DollarSign,
+  Users,
+  Building2,
+  Plus,
+  Trash2,
+  Check,
+} from "lucide-react";
 import { PRO_TALK_CATEGORIES } from "@/lib/proTalks";
+
 export interface Talk {
   id: string;
   name: string;
@@ -23,6 +33,9 @@ export interface Talk {
   category: string;
   mediaType: string;
   visibility: "PUBLIC" | "PRIVATE";
+  accessType?: "FREE" | "PRIVATE" | "PAID";
+  ticketPrice?: number | null;
+  ticketCapacity?: number | null;
   isLive: boolean;
   scheduledAt: string | null;
   shareToken: string | null;
@@ -94,12 +107,14 @@ function Dialog({
     </dialog>
   );
 }
+
 const localMinDate = () => {
   const date = new Date(Date.now() + 5 * 60000);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
 };
+
 export function HostTalkDialog({
   initialMode,
   hostSessionId,
@@ -116,7 +131,7 @@ export function HostTalkDialog({
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Open Discussion");
   const [mode, setMode] = useState(initialMode);
-  const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PUBLIC");
+  const [accessType, setAccessType] = useState<"FREE" | "PRIVATE" | "PAID">("FREE");
   const [mediaType, setMediaType] = useState<"AUDIO_VIDEO" | "AUDIO">(
     "AUDIO_VIDEO",
   );
@@ -126,6 +141,29 @@ export function HostTalkDialog({
   const [created, setCreated] = useState<Talk | null>(null);
   const [copied, setCopied] = useState(false);
   const stepTitle = useRef<HTMLHeadingElement>(null);
+
+  // Ticketed details
+  const [ticketPrice, setTicketPrice] = useState("29.99");
+  const [ticketCapacity, setTicketCapacity] = useState("25");
+  const [refundPolicy, setRefundPolicy] = useState<"NO_REFUNDS" | "REFUNDABLE_UNTIL_DATE">("NO_REFUNDS");
+  const [refundUntil, setRefundUntil] = useState("");
+  const [whatIsIncluded, setWhatIsIncluded] = useState<string[]>([
+    "Live interactive stage access & Q&A with the host",
+    "Downloadable resources & practice templates",
+    "Full video replay recording access",
+  ]);
+  const [newIncludedItem, setNewIncludedItem] = useState("");
+
+  const addIncludedItem = () => {
+    if (!newIncludedItem.trim()) return;
+    setWhatIsIncluded((prev) => [...prev, newIncludedItem.trim()]);
+    setNewIncludedItem("");
+  };
+
+  const removeIncludedItem = (index: number) => {
+    setWhatIsIncluded((prev) => prev.filter((_, i) => i !== index));
+  };
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -145,22 +183,43 @@ export function HostTalkDialog({
       setError("Choose a start time in the future.");
       return;
     }
+
+    const visibility =
+      accessType === "PAID"
+        ? "TICKETED"
+        : accessType === "PRIVATE"
+        ? "PRIVATE"
+        : "PUBLIC";
+
     setBusy(true);
     try {
+      const payload: Record<string, unknown> = {
+        name: name.trim(),
+        description: description.trim() || null,
+        category,
+        mediaType,
+        visibility,
+        accessType,
+        ...(hostSessionId ? { hostSessionId } : {}),
+        ...(mode === "schedule"
+          ? { scheduledAt: new Date(date).toISOString() }
+          : {}),
+      };
+
+      if (accessType === "PAID") {
+        payload.ticketPrice = parseFloat(ticketPrice) || 29.99;
+        payload.ticketCapacity = parseInt(ticketCapacity, 10) || 25;
+        payload.refundPolicy = refundPolicy;
+        payload.whatIsIncluded = whatIsIncluded;
+        if (refundPolicy === "REFUNDABLE_UNTIL_DATE" && refundUntil) {
+          payload.refundUntil = new Date(refundUntil).toISOString();
+        }
+      }
+
       const response = await fetch("/api/spaces", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-          category,
-          mediaType,
-          visibility,
-          ...(hostSessionId ? { hostSessionId } : {}),
-          ...(mode === "schedule"
-            ? { scheduledAt: new Date(date).toISOString() }
-            : {}),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok)
@@ -179,6 +238,7 @@ export function HostTalkDialog({
       setBusy(false);
     }
   }
+
   if (created)
     return (
       <Dialog title="Your talk is ready" onClose={onClose}>
@@ -190,7 +250,7 @@ export function HostTalkDialog({
           <h2>Your room is ready.</h2>
           <p>
             Invite your people to <strong>{created.name}</strong>. We’ll keep a
-            seat for them.
+            ticket for them.
           </p>
           <button
             className="pt-button pt-primary"
@@ -219,6 +279,7 @@ export function HostTalkDialog({
         </div>
       </Dialog>
     );
+
   return (
     <Dialog
       title="Host a Pro Talk"
@@ -241,7 +302,7 @@ export function HostTalkDialog({
               <i>{step > 1 ? <Tick01Icon size={13} /> : "1"}</i>The conversation
             </span>
             <span className={step === 2 ? "active" : ""}>
-              <i>2</i>The room
+              <i>2</i>The room &amp; access
             </span>
           </div>
           <form onSubmit={submit}>
@@ -331,36 +392,120 @@ export function HostTalkDialog({
                     </label>
                   )}
                 </fieldset>
+
                 <fieldset>
-                  <legend>Who’s invited?</legend>
-                  <div className="pt-choice-row">
-                    {(["PUBLIC", "PRIVATE"] as const).map((value) => (
-                      <label
-                        key={value}
-                        className={`pt-choice pt-choice-tall ${visibility === value ? "selected" : ""}`}
-                      >
-                        <input
-                          type="radio"
-                          name="visibility"
-                          checked={visibility === value}
-                          onChange={() => setVisibility(value)}
-                        />
-                        <strong>
-                          {value === "PUBLIC"
-                            ? "Public"
-                            : "Private / Invite only"}
-                        </strong>
-                        <small>
-                          {value === "PUBLIC"
-                            ? "Anyone can discover and join your talk."
-                            : "Hidden from discovery. An invitation link is required."}
-                        </small>
-                      </label>
-                    ))}
+                  <legend>Access &amp; Pricing</legend>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAccessType("FREE")}
+                      className={`p-3 rounded-2xl border text-left text-xs transition-all ${
+                        accessType === "FREE"
+                          ? "bg-emerald-500/20 border-lime-400 text-white"
+                          : "bg-[#040e1c] border-emerald-500/20 text-slate-400"
+                      }`}
+                    >
+                      <strong className="block text-white font-bold mb-1">Free / Public</strong>
+                      <span className="text-[11px] text-slate-400">Open to all members.</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccessType("PRIVATE")}
+                      className={`p-3 rounded-2xl border text-left text-xs transition-all ${
+                        accessType === "PRIVATE"
+                          ? "bg-purple-500/20 border-purple-400 text-white"
+                          : "bg-[#040e1c] border-emerald-500/20 text-slate-400"
+                      }`}
+                    >
+                      <strong className="block text-white font-bold mb-1">Private / Invite</strong>
+                      <span className="text-[11px] text-slate-400">Direct invite link only.</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccessType("PAID")}
+                      className={`p-3 rounded-2xl border text-left text-xs transition-all ${
+                        accessType === "PAID"
+                          ? "bg-gradient-to-br from-emerald-500/25 to-teal-500/20 border-lime-400 text-white"
+                          : "bg-[#040e1c] border-emerald-500/20 text-slate-400"
+                      }`}
+                    >
+                      <strong className="block text-white font-bold mb-1 flex items-center gap-1">
+                        <Ticket className="w-3.5 h-3.5 text-lime-400" /> Ticketed / Paid
+                      </strong>
+                      <span className="text-[11px] text-slate-400">Charge for entry ticket.</span>
+                    </button>
                   </div>
+
+                  {accessType === "PAID" && (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-[#040e1c] border border-emerald-500/30 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="block text-xs text-slate-300">
+                          Ticket Price ($)
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={ticketPrice}
+                            onChange={(e) => setTicketPrice(e.target.value)}
+                            className="w-full mt-1 px-3 py-2 rounded-xl bg-[#020812] border border-emerald-500/30 text-white text-xs"
+                          />
+                        </label>
+                        <label className="block text-xs text-slate-300">
+                          Ticket Capacity (Base: 25)
+                          <input
+                            type="number"
+                            value={ticketCapacity}
+                            onChange={(e) => setTicketCapacity(e.target.value)}
+                            className="w-full mt-1 px-3 py-2 rounded-xl bg-[#020812] border border-emerald-500/30 text-white text-xs"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="pt-1">
+                        <label className="block text-xs text-slate-300 mb-1">
+                          What&apos;s Included
+                        </label>
+                        <div className="space-y-1 mb-2">
+                          {whatIsIncluded.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between gap-1 text-[11px] text-slate-300 bg-white/5 px-2 py-1 rounded-lg"
+                            >
+                              <span className="truncate">{item}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeIncludedItem(idx)}
+                                className="text-slate-400 hover:text-rose-400"
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={newIncludedItem}
+                            onChange={(e) => setNewIncludedItem(e.target.value)}
+                            placeholder="Add takeaway/perk…"
+                            className="flex-1 px-2.5 py-1.5 rounded-lg bg-[#020812] border border-emerald-500/25 text-xs text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={addIncludedItem}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-lime-300 text-xs font-bold"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </fieldset>
+
                 <fieldset>
-                  <legend>Make it your kind of room</legend>
+                  <legend>Media Format</legend>
                   <div className="pt-choice-row">
                     {(["AUDIO_VIDEO", "AUDIO"] as const).map((value) => (
                       <label
@@ -452,7 +597,11 @@ export function HostTalkDialog({
           </p>
           <div className="pt-preview-meta">
             <UserGroupIcon size={15} />
-            {visibility === "PRIVATE" ? "Invite only" : "Open to the community"}
+            {accessType === "PAID"
+              ? `Ticketed · $${parseFloat(ticketPrice || "0").toFixed(2)}`
+              : accessType === "PRIVATE"
+              ? "Invite only"
+              : "Open to the community"}
           </div>
           <div className="pt-preview-bottom">YOUR VOICE. YOUR ROOM.</div>
         </aside>
@@ -460,6 +609,7 @@ export function HostTalkDialog({
     </Dialog>
   );
 }
+
 export function HostingAccessDialog({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -513,7 +663,7 @@ export function HostingAccessDialog({ onClose }: { onClose: () => void }) {
               <Tick01Icon size={16} /> Audio, video & screen sharing
             </li>
             <li>
-              <Tick01Icon size={16} /> Public and invite-only rooms
+              <Tick01Icon size={16} /> Public, private &amp; paid ticketed rooms
             </li>
           </ul>
           <Link className="pt-button pt-primary" href="/upgrade">

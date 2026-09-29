@@ -11,7 +11,7 @@ function load(file, mocks = {}) {
   return exports;
 }
 const { proTalkPublishPermissions } = load('lib/proTalkPermissions.ts');
-const { canAccessSpace } = load('lib/spaceAccess.ts');
+const { canAccessSpace } = load('lib/spaceAccess.ts', { '@/lib/ticketedProTalks': { isTicketedSpace: (s) => s?.visibility === 'TICKETED' || s?.accessType === 'PAID' } });
 const space = { id: 'talk', hostId: 'host', coHostIds: ['cohost'], visibility: 'PRIVATE', shareToken: 'secret', isLive: true, roomName: 'room' };
 const req = (cookie, body) => new NextRequest('http://localhost/api/spaces/talk', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body || {}) });
 let session = null;
@@ -23,7 +23,7 @@ const auth = { api: { getSession: async () => session } };
 class AccessToken { constructor(_, __, options) { this.options = options; tokenMetadata = JSON.parse(options.metadata || "{}"); } addGrant(value) { grant = value; } async toJwt() { return 'test-token'; } }
 let participantUpdate;
 class RoomServiceClient { async deleteRoom() {} async getParticipant() { return { metadata: '{}' }; } async updateParticipant(room, identity, options) { participantUpdate = { room, identity, options }; } }
-const mocks = { '@/lib/proTalkPermissions': { proTalkPublishPermissions }, '@/lib/auth': { auth }, '@/lib/prisma': { prisma: db }, '@/lib/spaceAccess': { canAccessSpace }, 'livekit-server-sdk': { AccessToken, RoomServiceClient } };
+const mocks = { '@/lib/proTalkPermissions': { proTalkPublishPermissions }, '@/lib/ticketedProTalks': { isTicketedSpace: () => false }, '@/lib/auth': { auth }, '@/lib/prisma': { prisma: db }, '@/lib/spaceAccess': { canAccessSpace }, 'livekit-server-sdk': { AccessToken, RoomServiceClient } };
 const params = { params: Promise.resolve({ id: 'talk' }) };
 (async () => {
   assert.equal(canAccessSpace(req(), space), false);
@@ -132,6 +132,7 @@ const params = { params: Promise.resolve({ id: 'talk' }) };
     },
     spaceRsvp: { findMany: async () => [{ spaceId: 'talk' }] },
     spaceAttendance: { findMany: async () => [{ spaceId: 'talk' }] },
+    spaceTicket: { findMany: async () => [] },
   };
   const spacesRoute = load('app/api/spaces/route.ts', { ...mocks, '@/lib/prisma': { prisma: spacesDb } });
   session = { user: { id: 'attendee' } };

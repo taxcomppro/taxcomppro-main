@@ -185,6 +185,8 @@ model User {
   spaceRsvps          SpaceRsvp[]
   spaceReports        SpaceReport[]
   spaceAttendances    SpaceAttendance[]
+  spaceTickets        SpaceTicket[]
+  spaceCapacityOrders SpaceCapacityOrder[]
   proApplication      ProfessionalApplication?
   proServices         ProService[]
   reviewsReceived     ProReview[]  @relation("ReviewedPro")
@@ -810,18 +812,81 @@ model Space {
   replayDurationMinutes Int?
   isReplay              Boolean   @default(false)
   coHostIds             String[]  @default([])
-  visibility            String    @default("PUBLIC")
+  visibility            String    @default("PUBLIC") // "PUBLIC", "PRIVATE", "TICKETED"
+  accessType            String    @default("PUBLIC") // "PUBLIC", "PRIVATE", "TICKETED"
+  ticketPrice           Float     @default(0)
+  ticketCapacity        Int       @default(25)
+  baseTicketAllowance   Int       @default(25)
+  bonusTicketCapacity   Int       @default(0)
+  ticketsSold           Int       @default(0)
+  salesStartsAt         DateTime?
+  salesEndsAt           DateTime?
+  salesClosedEarly      Boolean   @default(false)
+  refundPolicy          String    @default("NO_REFUNDS") // "NO_REFUNDS", "REFUND_UNTIL_DATE"
+  refundUntil           DateTime?
+  whatIsIncluded        String[]  @default([])
+  networkId             String?
+  isNetworkExclusive    Boolean   @default(false)
   taggedListingId       String?
   createdAt             DateTime  @default(now())
   endedAt               DateTime?
 
   host          User                @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  network       ProNetwork?         @relation(fields: [networkId], references: [id], onDelete: SetNull)
   taggedListing MarketplaceListing? @relation("SpaceTaggedListing", fields: [taggedListingId], references: [id], onDelete: SetNull)
   rsvps         SpaceRsvp[]
   reports       SpaceReport[]
   attendances   SpaceAttendance[]
+  tickets       SpaceTicket[]
+  capacityOrders SpaceCapacityOrder[]
 
   @@map("spaces")
+}
+
+model SpaceTicket {
+  id                    String    @id @default(cuid())
+  spaceId               String
+  userId                String
+  ticketNumber          String    @unique
+  pricePaid             Float     @default(0)
+  currency              String    @default("usd")
+  status                String    @default("CONFIRMED") // CONFIRMED, REFUNDED, CANCELLED
+  stripeSessionId       String?   @unique
+  stripePaymentIntentId String?
+  paymentStatus         String    @default("PAID") // PAID, REFUNDED, FAILED
+  refundedAt            DateTime?
+  refundReason          String?
+  customerName          String
+  customerEmail         String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  space                 Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, userId])
+  @@index([spaceId, status])
+  @@index([userId, status])
+  @@map("space_tickets")
+}
+
+model SpaceCapacityOrder {
+  id              String    @id @default(cuid())
+  spaceId         String
+  hostId          String
+  packKey         String    // "PACK_25", "PACK_50", "PACK_100", "PACK_250", "PACK_500"
+  additionalSeats Int       // 25, 50, 100, 250, 500
+  pricePaid       Float     // 9.99, 14.99, 24.99, 49.99, 99.99
+  stripeSessionId String?   @unique
+  status          String    @default("COMPLETED") // COMPLETED, PENDING, FAILED
+  createdAt       DateTime  @default(now())
+
+  space           Space     @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  host            User      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId])
+  @@index([hostId])
+  @@map("space_capacity_orders")
 }
 
 model SpaceRsvp {
@@ -1766,6 +1831,7 @@ model ProNetwork {
   chatMessages        ProNetworkChatMessage[]
   questions           ProNetworkQuestion[]
   products            ProNetworkProduct[]
+  spaces              Space[]
 
   @@map("pro_networks")
 }

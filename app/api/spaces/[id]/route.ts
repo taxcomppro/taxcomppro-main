@@ -4,10 +4,18 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { nanoid } from "nanoid";
 import { RoomServiceClient } from "livekit-server-sdk";
+import { isTicketedSpace } from "@/lib/ticketedProTalks";
 
 type Params = { params: Promise<{ id: string }> };
 
-const HOST_SELECT = { id: true, name: true, image: true, headline: true, role: true, tier: true };
+const HOST_SELECT = {
+  id: true,
+  name: true,
+  image: true,
+  headline: true,
+  role: true,
+  tier: true,
+};
 
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -18,19 +26,65 @@ export async function GET(req: NextRequest, { params }: Params) {
     where: { id },
     include: {
       host: { select: HOST_SELECT },
-      _count: { select: { rsvps: true, attendances: true } },
-      ...(userId ? {
-        attendances: { where: { userId }, select: { userId: true } },
-        rsvps: { where: { userId }, select: { userId: true } },
-      } : {}),
+      network: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoImage: true,
+          members: {
+            where: userId ? { userId } : { userId: "__none__" },
+            select: { userId: true, status: true, role: true },
+          },
+        },
+      },
+      _count: { select: { rsvps: true, attendances: true, tickets: true } },
+      ...(userId
+        ? {
+            attendances: { where: { userId }, select: { userId: true } },
+            rsvps: { where: { userId }, select: { userId: true } },
+            tickets: {
+              where: { userId, status: "CONFIRMED" },
+              select: {
+                id: true,
+                ticketNumber: true,
+                pricePaid: true,
+                status: true,
+                createdAt: true,
+                paymentStatus: true,
+              },
+            },
+          }
+        : {}),
     },
   });
+
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!canAccessSpace(req, space, session?.user)) return NextResponse.json({ error: "This Pro Talk is invite only. Open your invitation link to join." }, { status: 403 });
-  return NextResponse.json(space);
+
+  const isTicketed = isTicketedSpace(space);
+  const hasAccess = canAccessSpace(req, space as any, session?.user);
+  const userTicket = (space as any).tickets?.[0] || null;
+  const capacity = space.ticketCapacity || 25;
+  const sold = space.ticketsSold || 0;
+  const remaining = Math.max(0, capacity - sold);
+
+  return NextResponse.json({
+    ...space,
+    accessType: isTicketed
+      ? "PAID"
+      : space.visibility === "PRIVATE" || space.accessType === "PRIVATE"
+      ? "PRIVATE"
+      : "FREE",
+    hasAccess,
+    isTicketed,
+    ticketsRemaining: remaining,
+    hasTicket: !!userTicket,
+    ticketNumber: userTicket?.ticketNumber || null,
+    userTicket,
+  });
 }
 
-// PATCH /api/spaces/[id] — host starts a scheduled space or updates replay info
+// PATCH /api/spaces/[id] — host starts a scheduled space or updates settings
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -70,30 +124,72 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
-  if (body.visibility !== undefined) {
-    if (body.visibility !== "PUBLIC" && body.visibility !== "PRIVATE") return NextResponse.json({ error: "Invalid visibility" }, { status: 400 });
-    dataToUpdate.visibility = body.visibility;
-    if (body.visibility === "PRIVATE" && space.visibility !== "PRIVATE") {
-      // An old public link must not become an invitation to a private room.
+  if (body.visibility !== undefined || body.accessType !== undefined) {
+    const rawVis = (body.visibility || body.accessType) as string;
+    const isPaid = rawVis === "PAID" || rawVis === "TICKETED";
+    if (!isPaid && !["PUBLIC", "PRIVATE", "FREE"].includes(rawVis)) {
+      return NextResponse.json({ error: "Invalid visibility" }, { status: 400 });
+    }
+    dataToUpdate.visibility = isPaid ? "TICKETED" : (rawVis === "PRIVATE" ? "PRIVATE" : "PUBLIC");
+    dataToUpdate.accessType = isPaid ? "PAID" : (rawVis === "PRIVATE" ? "PRIVATE" : "FREE");
+    if (rawVis === "PRIVATE" && space.visibility !== "PRIVATE") {
       dataToUpdate.shareToken = nanoid(32);
     }
   }
 
-  if (typeof body.isLive === "boolean") {
-    dataToUpdate.isLive = body.isLive;
-  } else if (Object.keys(body).length === 0) {
-    dataToUpdate.isLive = true;
+  if (body.ticketPrice !== undefined) {
+    const numPrice = Number(body.ticketPrice);
+    if (!isNaN(numPrice) && numPrice >= 0) {
+      dataToUpdate.ticketPrice = numPrice;
+    }
   }
 
-  if (typeof body.replayUrl === "string") {
-    dataToUpdate.replayUrl = body.replayUrl.trim() || null;
-    dataToUpdate.isReplay = true;
+  if (body.ticketCapacity !== undefined) {
+    const numCap = Number(body.ticketCapacity);
+    if (!isNaN(numCap) && numCap >= 1) {
+      dataToUpdate.ticketCapacity = numCap;
+    }
   }
-  if (typeof body.replayDurationMinutes === "number") {
-    dataToUpdate.replayDurationMinutes = body.replayDurationMinutes;
+
+  if (body.salesStartsAt !== undefined) {
+    dataToUpdate.salesStartsAt = body.salesStartsAt ? new Date(body.salesStartsAt as string) : null;
   }
-  if (typeof body.isReplay === "boolean") {
-    dataToUpdate.isReplay = body.isReplay;
+
+  if (body.salesEndsAt !== undefined) {
+    dataToUpdate.salesEndsAt = body.salesEndsAt ? new Date(body.salesEndsAt as string) : null;
+  }
+
+  if (typeof body.salesClosedEarly === "boolean") {
+    dataToUpdate.salesClosedEarly = body.salesClosedEarly;
+  }
+
+  if (typeof body.refundPolicy === "string") {
+    dataToUpdate.refundPolicy = body.refundPolicy;
+  }
+
+  if (body.refundUntil !== undefined) {
+    dataToUpdate.refundUntil = body.refundUntil ? new Date(body.refundUntil as string) : null;
+  }
+
+  if (Array.isArray(body.whatIsIncluded)) {
+    dataToUpdate.whatIsIncluded = body.whatIsIncluded.filter(
+      (item: unknown) => typeof item === "string" && item.trim().length > 0
+    );
+  }
+
+  if (body.networkId !== undefined) {
+    dataToUpdate.networkId = typeof body.networkId === "string" && body.networkId.trim() ? body.networkId.trim() : null;
+  }
+
+  if (typeof body.isNetworkExclusive === "boolean") {
+    dataToUpdate.isNetworkExclusive = body.isNetworkExclusive;
+  }
+
+  if (typeof body.isLive === "boolean") {
+    dataToUpdate.isLive = body.isLive;
+    if (body.isLive) {
+      dataToUpdate.endedAt = null;
+    }
   }
 
   const updated = await prisma.space.update({
@@ -101,87 +197,64 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data: dataToUpdate,
     include: {
       host: { select: HOST_SELECT },
-      _count: { select: { rsvps: true, attendances: true } },
+      network: { select: { id: true, name: true, slug: true, logoImage: true } },
+      _count: { select: { rsvps: true, attendances: true, tickets: true } },
     },
   });
 
   return NextResponse.json(updated);
 }
 
-// DELETE /api/spaces/[id] — host/admin can end a live space or cancel a scheduled space
+// DELETE /api/spaces/[id] — host ends or cancels the space
 export async function DELETE(req: NextRequest, { params }: Params) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+  const { searchParams } = new URL(req.url);
+  const action = searchParams.get("action"); // "cancel" or default "end"
+
   const space = await prisma.space.findUnique({ where: { id } });
   if (!space) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const isAdmin = session.user.role === "ADMIN";
   const isHost = space.hostId === session.user.id;
   if (!isAdmin && !isHost)
-    return NextResponse.json({ error: "Only the host or admin can manage this Pro Talk." }, { status: 403 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { searchParams } = new URL(req.url);
-  const action = searchParams.get("action");
-  const isScheduledNotLive = Boolean(space.scheduledAt && !space.isLive && !space.endedAt);
-
-  if (action === "cancel" || action === "delete" || isScheduledNotLive) {
+  // If cancelling a scheduled talk that has not gone live
+  if (action === "cancel" && !space.isLive && !space.endedAt) {
     await prisma.space.delete({ where: { id } });
-    return NextResponse.json({ ok: true, cancelled: true, id });
+    return NextResponse.json({ success: true, message: "Talk cancelled and removed" });
   }
 
-  const endedAt = new Date();
-  const durationMinutes = Math.max(
-    1,
-    Math.round((endedAt.getTime() - new Date(space.createdAt).getTime()) / 60000)
-  );
+  // End LiveKit room if active
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
-  // Compute total unique attendees
-  const uniqueAttendees = await prisma.spaceAttendance.count({
-    where: { spaceId: id },
-  });
-  const total = Math.max(space.totalAttendees, uniqueAttendees);
+  if (apiKey && apiSecret && wsUrl) {
+    try {
+      const httpUrl = wsUrl.replace(/^ws/, "http");
+      const roomService = new RoomServiceClient(httpUrl, apiKey, apiSecret);
+      await roomService.deleteRoom(space.roomName);
+    } catch {
+      // Room may already be closed in LiveKit
+    }
+  }
 
-  // Mark ended in DB
-  const endedSpace = await prisma.space.update({
+  // Update space as ended
+  const updated = await prisma.space.update({
     where: { id },
     data: {
       isLive: false,
-      endedAt,
-      totalAttendees: total,
-      replayDurationMinutes: durationMinutes,
+      endedAt: new Date(),
     },
-    select: {
-      id: true,
-      name: true,
-      totalAttendees: true,
-      peakAttendees: true,
-      createdAt: true,
-      endedAt: true,
-      replayDurationMinutes: true,
+    include: {
+      host: { select: HOST_SELECT },
+      network: { select: { id: true, name: true, slug: true, logoImage: true } },
     },
   });
 
-  // Force-disconnect all LiveKit participants by deleting the room.
-  try {
-    const lkHttpUrl = (process.env.LIVEKIT_URL ?? "").replace(/^wss?:\/\//, "https://");
-    const svc = new RoomServiceClient(
-      lkHttpUrl,
-      process.env.LIVEKIT_API_KEY!,
-      process.env.LIVEKIT_API_SECRET!
-    );
-    await svc.deleteRoom(space.roomName);
-  } catch {
-    // Non-fatal: room may already be empty/gone
-  }
-
-  return NextResponse.json({
-    ok: true,
-    summary: {
-      totalAttendees: endedSpace.totalAttendees,
-      peakAttendees: endedSpace.peakAttendees,
-      durationMinutes: endedSpace.replayDurationMinutes,
-    },
-  });
+  return NextResponse.json(updated);
 }
