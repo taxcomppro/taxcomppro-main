@@ -34,6 +34,8 @@ import {
 } from "hugeicons-react";
 import ProTalkProductSpotlight from "./ProTalkProductSpotlight";
 import ProTalkTagProductModal from "./ProTalkTagProductModal";
+import { useProTalkAudioRecovery } from "./useProTalkAudioRecovery";
+import AudioRecoveryBanner from "./AudioRecoveryBanner";
 import {
   Clock,
   Loader2,
@@ -857,6 +859,14 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
     setTimeout(() => setToastMessage(null), 4000);
   }, []);
 
+  const { audioInterrupted, isResuming, resumeAudio } = useProTalkAudioRecovery({
+    room,
+    localParticipant,
+    isApprovedSpeaker,
+    isMicrophoneEnabled,
+    onToast: showToast,
+  });
+
   const safePublishData = useCallback(
     (payload: object) => {
       try {
@@ -1443,6 +1453,13 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
     >
       <RoomAudioRenderer />
       <StartAudio label="Enable stage audio" className="sr-enable-audio" />
+
+      {audioInterrupted && (
+        <AudioRecoveryBanner
+          onTapToResume={resumeAudio}
+          isResuming={isResuming}
+        />
+      )}
 
       {isEndedByHost && (
         <ExitScreen
