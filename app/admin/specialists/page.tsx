@@ -15,6 +15,7 @@ import {
   RefreshIcon,
   Search01Icon,
   Link01Icon,
+  Image01Icon,
 } from "hugeicons-react";
 import LinkifiedText from "@/components/ui/LinkifiedText";
 
@@ -174,6 +175,9 @@ export default function SpecialistsAdmin() {
   const [manualDestination, setManualDestination] = useState<"FEED" | "GROUP" | "FORUM" | "NETWORK">("FEED");
   const [manualDestinationId, setManualDestinationId] = useState<string>("");
   const [manualContent, setManualContent] = useState("");
+  const [manualImages, setManualImages] = useState<string[]>([]);
+  const [uploadingManualImage, setUploadingManualImage] = useState(false);
+  const manualFileInputRef = useRef<HTMLInputElement>(null);
   const [manualLinkUrl, setManualLinkUrl] = useState("");
   const [manualLinkText, setManualLinkText] = useState("");
   const [showManualLinkHelper, setShowManualLinkHelper] = useState(false);
@@ -189,6 +193,8 @@ export default function SpecialistsAdmin() {
     setTestAnswer(null);
     setTestQuestion("");
     setManualPostOpen(false);
+    setManualImages([]);
+    setUploadingManualImage(false);
     setShowManualLinkHelper(false);
     setShowDraftLinkHelper(false);
   }, []);
@@ -245,9 +251,41 @@ export default function SpecialistsAdmin() {
     }
   }
 
+  async function handleManualImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    const remaining = 4 - manualImages.length;
+    if (remaining <= 0) {
+      setError("Maximum 4 images allowed per post.");
+      return;
+    }
+    const filesToUpload = Array.from(files).slice(0, remaining);
+    setUploadingManualImage(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      filesToUpload.forEach((f) => fd.append("files", f));
+      fd.append("folder", "taxcomppro/specialists");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Image upload failed");
+      const urls: string[] = d.urls || (d.url ? [d.url] : []);
+      setManualImages((prev) => [...prev, ...urls].slice(0, 4));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not upload image(s)");
+    } finally {
+      setUploadingManualImage(false);
+      if (manualFileInputRef.current) manualFileInputRef.current.value = "";
+    }
+  }
+
+  const removeManualImage = (idx: number) => {
+    setManualImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   async function handleManualPost(publishNow: boolean) {
-    if (!manualContent.trim()) {
-      setError("Please enter post content.");
+    if (!manualContent.trim() && manualImages.length === 0) {
+      setError("Please enter post content or upload an image.");
       return;
     }
     setBusy(true);
@@ -261,6 +299,7 @@ export default function SpecialistsAdmin() {
           action: "manualPost",
           specialistId: manualSpecialistId,
           content: manualContent.trim(),
+          images: manualImages,
           destination: manualDestination,
           destinationId: manualDestinationId || null,
           publishNow,
@@ -271,6 +310,7 @@ export default function SpecialistsAdmin() {
       await load();
       setManualPostOpen(false);
       setManualContent("");
+      setManualImages([]);
       setManualLinkUrl("");
       setManualLinkText("");
       setShowManualLinkHelper(false);
@@ -299,6 +339,7 @@ export default function SpecialistsAdmin() {
       setManualDestinationId(first.destinationId || "");
     }
     setManualContent("");
+    setManualImages([]);
     setShowManualLinkHelper(false);
     setManualPostOpen(true);
   };
@@ -874,25 +915,56 @@ export default function SpecialistsAdmin() {
                   <label htmlFor="manual-post-textarea" style={{ fontSize: "12px", fontWeight: 700 }}>
                     Post Content &amp; Guidance
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowManualLinkHelper((v) => !v)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      background: showManualLinkHelper ? "#3b82f620" : "transparent",
-                      border: "1px solid #3b82f650",
-                      color: "#3b82f6",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Link01Icon size={13} /> Add Clickable Link
-                  </button>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      disabled={uploadingManualImage || manualImages.length >= 4}
+                      onClick={() => manualFileInputRef.current?.click()}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        background: uploadingManualImage ? "#10b98120" : "transparent",
+                        border: "1px solid #10b98160",
+                        color: "#10b981",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        cursor: manualImages.length >= 4 ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <Image01Icon size={13} /> {uploadingManualImage ? "Uploading..." : `Upload Image${manualImages.length > 0 ? ` (${manualImages.length}/4)` : ""}`}
+                    </button>
+                    <input
+                      type="file"
+                      ref={manualFileInputRef}
+                      accept="image/*"
+                      multiple
+                      style={{ display: "none" }}
+                      onChange={handleManualImageUpload}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowManualLinkHelper((v) => !v)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        background: showManualLinkHelper ? "#3b82f620" : "transparent",
+                        border: "1px solid #3b82f650",
+                        color: "#3b82f6",
+                        padding: "4px 10px",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Link01Icon size={13} /> Add Clickable Link
+                    </button>
+                  </div>
                 </div>
 
                 {/* Link Helper Popover */}
@@ -933,6 +1005,45 @@ export default function SpecialistsAdmin() {
                   style={{ width: "100%", fontSize: "13.5px", lineHeight: "1.6", padding: "12px", borderRadius: "10px" }}
                 />
 
+                {/* Attached Images Thumbnail Bar */}
+                {manualImages.length > 0 && (
+                  <div style={{ marginTop: "8px", padding: "10px 12px", background: "var(--a-inner)", borderRadius: "10px", border: "1px solid var(--a-line)" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--a-gold)", display: "block", marginBottom: "8px" }}>
+                      📷 Attached Images ({manualImages.length}/4):
+                    </span>
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                      {manualImages.map((imgUrl, idx) => (
+                        <div key={idx} style={{ position: "relative", width: "72px", height: "72px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--a-line)", background: "#000" }}>
+                          <img src={imgUrl} alt={`Attachment ${idx + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <button
+                            type="button"
+                            onClick={() => removeManualImage(idx)}
+                            aria-label="Remove image"
+                            style={{
+                              position: "absolute",
+                              top: "3px",
+                              right: "3px",
+                              width: "18px",
+                              height: "18px",
+                              borderRadius: "50%",
+                              background: "rgba(0,0,0,0.8)",
+                              color: "#fff",
+                              border: "none",
+                              fontSize: "10px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", fontSize: "11px", color: "var(--a-muted)" }}>
                   <span>Tip: Markdown links [Text](URL) and raw URLs are both rendered as clickable links.</span>
                   <span>{manualContent.length} characters</span>
@@ -940,14 +1051,23 @@ export default function SpecialistsAdmin() {
               </div>
 
               {/* Live Preview */}
-              {manualContent.trim() && (
+              {(manualContent.trim() || manualImages.length > 0) && (
                 <div style={{ background: "var(--a-inner)", padding: "12px 14px", borderRadius: "10px", border: "1px solid var(--a-line)" }}>
                   <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--a-gold)", display: "block", marginBottom: "4px" }}>
                     Live Preview:
                   </span>
-                  <div style={{ fontSize: "13px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
-                    <LinkifiedText text={manualContent} />
-                  </div>
+                  {manualContent.trim() && (
+                    <div style={{ fontSize: "13px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                      <LinkifiedText text={manualContent} />
+                    </div>
+                  )}
+                  {manualImages.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: manualImages.length === 1 ? "1fr" : "repeat(auto-fit, minmax(100px, 1fr))", gap: "8px", marginTop: "10px" }}>
+                      {manualImages.map((imgUrl, i) => (
+                        <img key={i} src={imgUrl} alt="Preview attachment" style={{ width: "100%", maxHeight: "180px", objectFit: "cover", borderRadius: "8px", border: "1px solid var(--a-line)" }} />
+                      ))}
+                    </div>
+                  )}
                   <small style={{ display: "block", marginTop: "8px", color: "var(--a-muted)" }}>
                     {selectedManualBot?.user.name} · Tax Comp Pro AI Specialist
                   </small>

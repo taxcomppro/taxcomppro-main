@@ -408,11 +408,19 @@ export async function publishActivity(id: string) {
           create: { userId: authorId, communityId: job.destinationId },
         });
       }
+      const imageRegex = /!\[(?:.*?)\]\((https?:\/\/[^)]+)\)/g;
+      const matchedImages: string[] = [];
+      let match;
+      while ((match = imageRegex.exec(content)) !== null) {
+        matchedImages.push(match[1]);
+      }
+      const cleanContent = matchedImages.length > 0 ? content.replace(imageRegex, "").trim() : content;
+
       const post = await tx.post.create({
         data: {
-          content,
+          content: cleanContent,
           authorId,
-          images: [],
+          images: matchedImages,
           communityId: job.destination === "GROUP" ? job.destinationId : null,
         },
       });

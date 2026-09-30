@@ -138,11 +138,22 @@ export async function POST(req: NextRequest) {
       const destination = z.enum(["FEED", "GROUP", "FORUM", "NETWORK"]).parse(body.destination || "FEED");
       const destinationId = body.destinationId ? String(body.destinationId) : null;
       const publishNow = Boolean(body.publishNow);
+      const rawImages = Array.isArray(body.images) ? body.images : [];
+      const images: string[] = rawImages.filter((img: any) => typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://") || img.startsWith("/")));
 
       const bot = await prisma.aiSpecialist.findUniqueOrThrow({
         where: { id: specialistId },
         include: { user: true },
       });
+
+      let fullContent = content;
+      if (images.length > 0) {
+        const missingImages = images.filter((img) => !fullContent.includes(img));
+        if (missingImages.length > 0) {
+          const imageMarkdown = missingImages.map((img) => `\n\n![Attachment](${img})`).join("");
+          fullContent = `${fullContent}${imageMarkdown}`;
+        }
+      }
 
       const activity = await prisma.aiActivity.create({
         data: {
@@ -152,7 +163,7 @@ export async function POST(req: NextRequest) {
           destination,
           destinationId,
           status: "DRAFT",
-          content,
+          content: fullContent,
           provider: "manual",
         },
       });
