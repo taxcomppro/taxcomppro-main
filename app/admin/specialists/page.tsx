@@ -187,6 +187,9 @@ export default function SpecialistsAdmin() {
   const [draftLinkText, setDraftLinkText] = useState("");
   const [showDraftLinkHelper, setShowDraftLinkHelper] = useState(false);
 
+  // Delete Confirmation State
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string; type: "published" | "entry"; label: string } | null>(null);
+
   const closeDialog = useCallback(() => {
     setEditing(null);
     setDraft(null);
@@ -197,9 +200,10 @@ export default function SpecialistsAdmin() {
     setUploadingManualImage(false);
     setShowManualLinkHelper(false);
     setShowDraftLinkHelper(false);
+    setDeleteConfirmTarget(null);
   }, []);
 
-  useAdminDialog(!!editing || !!draft || manualPostOpen, closeDialog);
+  useAdminDialog(!!editing || !!draft || manualPostOpen || !!deleteConfirmTarget, closeDialog);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/specialists");
@@ -238,6 +242,12 @@ export default function SpecialistsAdmin() {
         setNotice("Specialist post generated and published live!");
       } else if (actionName === "publish") {
         setNotice("Post published successfully!");
+      } else if (actionName === "deletePublished") {
+        setNotice("Live post deleted and removed from feed.");
+      } else if (actionName === "deleteActivity") {
+        setNotice("Activity entry deleted.");
+      } else if (actionName === "discard") {
+        setNotice("Activity discarded and unlinked.");
       } else if (actionName === "runSchedule") {
         setNotice(`Schedule triggered. Results: ${JSON.stringify(d.results)}`);
       } else {
@@ -784,6 +794,23 @@ export default function SpecialistsAdmin() {
                           View published post ↗
                         </Link>
                       )}
+                      {a.status === "PUBLISHED" && (
+                        <button
+                          disabled={busy}
+                          onClick={() => setDeleteConfirmTarget({ id: a.id, type: "published", label: a.content || "this post" })}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "#ef4444", borderColor: "#ef444440" }}
+                        >
+                          <Delete02Icon size={14} /> Delete Live Post
+                        </button>
+                      )}
+                      <button
+                        disabled={busy}
+                        onClick={() => setDeleteConfirmTarget({ id: a.id, type: "entry", label: "this queue entry" })}
+                        title="Delete queue log entry"
+                        style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: "var(--a-muted)" }}
+                      >
+                        <Delete02Icon size={14} /> Delete Entry
+                      </button>
                     </div>
                   </article>
                 );
@@ -797,6 +824,68 @@ export default function SpecialistsAdmin() {
             </div>
           </section>
         </>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmTarget && (
+        <div className="admin-dialog-backdrop">
+          <section
+            className="admin-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm deletion"
+            style={{ width: "min(440px, 95vw)" }}
+          >
+            <header style={{ borderBottom: "1px solid var(--a-line)", paddingBottom: "12px", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(239, 68, 68, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ef4444" }}>
+                  <Delete02Icon size={20} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: "16px", margin: 0, color: "var(--a-text)" }}>
+                    {deleteConfirmTarget.type === "published" ? "Delete Published Live Post?" : "Delete Queue Entry?"}
+                  </h2>
+                </div>
+              </div>
+              <button
+                onClick={() => setDeleteConfirmTarget(null)}
+                disabled={busy}
+                style={{ background: "transparent", border: "none", fontSize: "18px", cursor: "pointer", color: "var(--a-muted)" }}
+              >
+                ✕
+              </button>
+            </header>
+            <p style={{ fontSize: "13px", color: "var(--a-muted)", lineHeight: 1.5, margin: "0 0 16px 0" }}>
+              {deleteConfirmTarget.type === "published"
+                ? "This will immediately and permanently delete this published post and its comments from the live feed and community."
+                : "This will remove this activity log entry permanently."}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                disabled={busy}
+                onClick={() => setDeleteConfirmTarget(null)}
+                style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--a-line)", background: "transparent", color: "var(--a-text)", cursor: "pointer", fontSize: "13px" }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={busy}
+                onClick={async () => {
+                  const target = deleteConfirmTarget;
+                  setDeleteConfirmTarget(null);
+                  if (target.type === "published") {
+                    await action("deletePublished", target.id);
+                  } else {
+                    await action("deleteActivity", target.id);
+                  }
+                }}
+                style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "#ef4444", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "13px" }}
+              >
+                {busy ? "Deleting…" : "Yes, Delete"}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {/* Manual Post as Specialist Dialog */}

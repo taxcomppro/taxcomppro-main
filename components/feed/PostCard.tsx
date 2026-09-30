@@ -85,6 +85,9 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
   const [deleting, setDeleting]     = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwn = user?.id === post.author.id;
+  const isAdmin = user?.role === "ADMIN";
+  const canDelete = isOwn || isAdmin;
+  const canEdit = isOwn;
 
   // close menu on outside click
   useEffect(() => {
@@ -199,23 +202,28 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
           )}
           <Link href={`/feed?post=${post.id}`} className="feed-post-time">{timeAgo(post.createdAt)}<span aria-hidden="true"> · </span>{post.community?.isPublic === false ? <LockIcon size={13} /> : <GlobeIcon size={13} />}</Link>
         </div>
-        {/* Three-dot menu for own posts */}
-        {isOwn && (
+        {/* Three-dot menu for authors and admins */}
+        {(canEdit || canDelete) && (
           <div className="relative" ref={menuRef}>
             <button onClick={() => setMenuOpen(o => !o)}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#0a1628] transition-all">
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-[#0a1628] transition-all"
+              aria-label="Post options">
               <MoreHorizontal className="w-4 h-4" />
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-9 z-20 w-36 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
-                <button onClick={() => { setEditing(true); setEditText(post.content); setMenuOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                  <Pencil className="w-3.5 h-3.5 text-slate-400" /> Edit post
-                </button>
-                <button onClick={() => { setConfirmDelete(true); setMenuOpen(false); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" /> Delete post
-                </button>
+                {canEdit && (
+                  <button onClick={() => { setEditing(true); setEditText(post.content); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    <Pencil className="w-3.5 h-3.5 text-slate-400" /> Edit post
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={() => { setConfirmDelete(true); setMenuOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" /> Delete post
+                  </button>
+                )}
               </div>
             )}
           </div>

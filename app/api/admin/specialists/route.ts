@@ -103,10 +103,39 @@ export async function POST(req: NextRequest) {
     }
     if (body.action === "publish")
       return NextResponse.json(await publishActivity(String(body.id)));
+    if (body.action === "deletePublished" || body.action === "deleteActivity") {
+      const activity = await prisma.aiActivity.findUnique({
+        where: { id: String(body.id) },
+      });
+      if (activity?.publishedUrl) {
+        const feedMatch = activity.publishedUrl.match(/[?&]post=([a-zA-Z0-9_-]+)/);
+        if (feedMatch?.[1]) {
+          await prisma.post.delete({ where: { id: feedMatch[1] } }).catch(() => null);
+        }
+      }
+      if (body.action === "deleteActivity") {
+        await prisma.aiActivity.delete({ where: { id: String(body.id) } });
+      } else {
+        await prisma.aiActivity.update({
+          where: { id: String(body.id) },
+          data: { status: "DISCARDED", publishedUrl: null },
+        });
+      }
+      return NextResponse.json({ ok: true });
+    }
     if (body.action === "discard") {
+      const activity = await prisma.aiActivity.findUnique({
+        where: { id: String(body.id) },
+      });
+      if (activity?.publishedUrl) {
+        const feedMatch = activity.publishedUrl.match(/[?&]post=([a-zA-Z0-9_-]+)/);
+        if (feedMatch?.[1]) {
+          await prisma.post.delete({ where: { id: feedMatch[1] } }).catch(() => null);
+        }
+      }
       await prisma.aiActivity.updateMany({
-        where: { id: String(body.id), status: { in: ["DRAFT", "FAILED"] } },
-        data: { status: "DISCARDED" },
+        where: { id: String(body.id) },
+        data: { status: "DISCARDED", publishedUrl: null },
       });
       return NextResponse.json({ ok: true });
     }

@@ -51,6 +51,17 @@ export async function DELETE(
   if (post.authorId !== session.user.id && user?.role !== "ADMIN" && group?.creatorId !== session.user.id)
     return NextResponse.json({ error: "Only the author, group host, or a platform admin can delete this post." }, { status: 403 });
 
-  await prisma.post.delete({ where: { id: postId } });
+  await Promise.all([
+    prisma.post.delete({ where: { id: postId } }),
+    prisma.aiActivity.updateMany({
+      where: {
+        OR: [
+          { publishedUrl: `/feed?post=${postId}` },
+          { publishedUrl: { contains: postId } },
+        ],
+      },
+      data: { status: "DISCARDED", publishedUrl: null },
+    }).catch(() => null),
+  ]);
   return NextResponse.json({ ok: true });
 }
