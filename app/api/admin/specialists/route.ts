@@ -132,6 +132,38 @@ export async function POST(req: NextRequest) {
         ),
       );
     }
+    if (body.action === "manualPost") {
+      const specialistId = String(body.specialistId || body.id);
+      const content = z.string().min(1).max(12000).parse(body.content);
+      const destination = z.enum(["FEED", "GROUP", "FORUM", "NETWORK"]).parse(body.destination || "FEED");
+      const destinationId = body.destinationId ? String(body.destinationId) : null;
+      const publishNow = Boolean(body.publishNow);
+
+      const bot = await prisma.aiSpecialist.findUniqueOrThrow({
+        where: { id: specialistId },
+        include: { user: true },
+      });
+
+      const activity = await prisma.aiActivity.create({
+        data: {
+          specialistId: bot.id,
+          key: `manual:${crypto.randomUUID()}`,
+          kind: "POST",
+          destination,
+          destinationId,
+          status: "DRAFT",
+          content,
+          provider: "manual",
+        },
+      });
+
+      if (publishNow) {
+        const published = await publishActivity(activity.id);
+        return NextResponse.json({ ok: true, activity: published, publishedUrl: published.publishedUrl });
+      }
+
+      return NextResponse.json({ ok: true, activity });
+    }
     if (body.action === "runSchedule") {
       const results = await runSchedule();
       return NextResponse.json({ results });
@@ -152,8 +184,8 @@ export async function POST(req: NextRequest) {
     if (body.action === "editDraft") {
       const content = z.string().min(1).max(12000).parse(body.content);
       const result = await prisma.aiActivity.updateMany({
-        where: { id: String(body.id), status: "DRAFT" },
-        data: { content },
+        where: { id: String(body.id), status: { in: ["DRAFT", "FAILED"] } },
+        data: { content, status: "DRAFT", error: null },
       });
       if (!result.count) throw new Error("Draft is no longer editable.");
       return NextResponse.json({ ok: true });

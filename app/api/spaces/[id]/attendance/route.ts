@@ -127,3 +127,30 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Failed to retrieve attendance" }, { status: 500 });
   }
 }
+
+// PATCH /api/spaces/[id]/attendance — record leave event (Time Out)
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const session = await auth.api.getSession({ headers: req.headers }).catch(() => null);
+    const userId = session?.user?.id;
+    if (!userId) return NextResponse.json({ success: true });
+
+    await prisma.spaceAttendance.updateMany({
+      where: {
+        spaceId: id,
+        userId: userId,
+        leftAt: null,
+      },
+      data: {
+        leftAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error logging leave attendance:", error);
+    return NextResponse.json({ success: true });
+  }
+}
+

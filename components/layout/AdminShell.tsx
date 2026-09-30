@@ -6,8 +6,6 @@ import { useTheme } from "next-themes";
 import {
   DashboardSquare01Icon,
   UserGroupIcon,
-  BookOpen01Icon,
-  ShoppingBag01Icon,
   SparklesIcon,
   Settings01Icon,
   ChartHistogramIcon,
@@ -56,12 +54,6 @@ const groups = [
         href: "/admin/content?tab=networks",
         icon: UserGroupIcon,
       },
-      { label: "Courses", href: "/admin/courses", icon: BookOpen01Icon },
-      {
-        label: "Toolkits",
-        href: "/admin/content?tab=toolkits",
-        icon: ShoppingBag01Icon,
-      },
       {
         label: "Content calendar",
         href: "/admin/content-calendar",
@@ -79,7 +71,6 @@ const groups = [
     links: [
       { label: "Payments", href: "/admin/payments", icon: CreditCardIcon },
       { label: "Coupons", href: "/admin/coupons", icon: GiftIcon },
-      { label: "Affiliates", href: "/admin/affiliate", icon: UserGroupIcon },
       { label: "Emails", href: "/admin/emails", icon: Mail01Icon },
       { label: "Support", href: "/admin/support", icon: CustomerSupportIcon },
       { label: "Atlas settings", href: "/admin/atlas", icon: Settings01Icon },

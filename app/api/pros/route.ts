@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     },
     select: publicSelect,
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: 200,
   });
 
   return NextResponse.json(pros);

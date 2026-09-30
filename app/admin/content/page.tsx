@@ -3,6 +3,7 @@ import { useAdminDialog } from "@/components/layout/useAdminDialog";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+
 type Row = {
   id: string;
   name?: string;
@@ -18,11 +19,11 @@ type Row = {
   status?: string;
   category?: string;
   owner?: { name: string };
-  instructor?: { name: string };
-  _count?: { posts?: number; enrollments?: number };
-  asset?: { fileUrl: string; fileName: string } | null;
+  _count?: { posts?: number };
 };
+
 type Content = Record<string, Row[]>;
+
 export default function ContentAdmin() {
   return (
     <Suspense fallback={<p>Loading content…</p>}>
@@ -30,9 +31,10 @@ export default function ContentAdmin() {
     </Suspense>
   );
 }
+
 function ContentWorkspace() {
   const params = useSearchParams();
-  const tab = ["forums", "networks", "courses", "toolkits"].includes(
+  const tab = ["forums", "networks"].includes(
     params.get("tab") || "",
   )
     ? params.get("tab")!
@@ -45,11 +47,13 @@ function ContentWorkspace() {
   const [notice, setNotice] = useState("");
   const closeDialog = useCallback(() => setEditing(null), []);
   useAdminDialog(!!editing, closeDialog);
+
   async function load() {
     const r = await fetch("/api/admin/content");
     if (!r.ok) throw new Error("Could not load content");
     setData(await r.json());
   }
+
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/admin/content", { signal: controller.signal })
@@ -63,24 +67,17 @@ function ContentWorkspace() {
       });
     return () => controller.abort();
   }, []);
+
   async function save() {
     if (!editing) return;
     setBusy(true);
     setError("");
     try {
-      const body =
-        tab === "toolkits"
-          ? {
-              kind: "toolkit",
-              id: editing.id,
-              fileUrl: editing.asset?.fileUrl,
-              fileName: editing.asset?.fileName,
-            }
-          : {
-              ...editing,
-              description: editing.description || "",
-              kind: tab === "forums" ? "forum" : "network",
-            };
+      const body = {
+        ...editing,
+        description: editing.description || "",
+        kind: tab === "forums" ? "forum" : "network",
+      };
       const r = await fetch("/api/admin/content", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -97,15 +94,16 @@ function ContentWorkspace() {
       setBusy(false);
     }
   }
+
   const labels: Record<string, string> = {
     forums: "Pro Hub",
     networks: "Pro Networks",
-    courses: "Courses",
-    toolkits: "Toolkits",
   };
+
   const rows = (data[tab] || []).filter((r) =>
     (r.name || r.title || "").toLowerCase().includes(search.toLowerCase()),
   );
+
   return (
     <div className="admin-workspace">
       <header className="admin-page-heading">
@@ -119,21 +117,9 @@ function ContentWorkspace() {
         </div>
         <Link
           className="admin-primary"
-          href={
-            tab === "courses"
-              ? "/admin/courses/create"
-              : tab === "networks"
-                ? "/pro-networks/create"
-                : tab === "toolkits"
-                  ? "/toolkits"
-                  : "/pro-hub"
-          }
+          href={tab === "networks" ? "/pro-networks/create" : "/pro-hub"}
         >
-          {tab === "toolkits"
-            ? "View catalog"
-            : tab === "courses"
-              ? "Create course"
-              : "Open " + labels[tab]}
+          {"Open " + labels[tab]}
         </Link>
       </header>
       <div className="admin-metrics">
@@ -179,7 +165,7 @@ function ContentWorkspace() {
               <tr>
                 <th>Name</th>
                 <th>Status / owner</th>
-                <th>Activity / price</th>
+                <th>Activity</th>
                 <th>Manage</th>
               </tr>
             </thead>
@@ -197,57 +183,33 @@ function ContentWorkspace() {
                       ) : (
                         "Community discussion"
                       )
-                    ) : tab === "networks" ? (
+                    ) : (
                       <>
                         {r.isPublished ? "Published" : "Unpublished"}
                         <br />
                         <small>{r.owner?.name}</small>
                       </>
-                    ) : tab === "courses" ? (
-                      <>
-                        {r.status}
-                        <br />
-                        <small>{r.instructor?.name}</small>
-                      </>
-                    ) : r.asset ? (
-                      "Download configured"
-                    ) : (
-                      "No uploaded asset"
                     )}
                   </td>
                   <td>
                     {tab === "forums"
                       ? `${r._count?.posts || 0} discussions`
-                      : tab === "networks"
-                        ? `${r.memberCount || 0} members`
-                        : tab === "courses"
-                          ? `${r._count?.enrollments || 0} enrollments`
-                          : `$${r.price}`}
+                      : `${r.memberCount || 0} members`}
                   </td>
                   <td>
                     <div className="admin-actions">
-                      {tab === "courses" ? (
-                        <Link href={`/admin/courses/edit/${r.id}`}>
-                          Edit course
-                        </Link>
-                      ) : (
-                        <button onClick={() => setEditing(structuredClone(r))}>
-                          {tab === "toolkits" ? "Manage download" : "Edit"}
-                        </button>
-                      )}
-                      {tab !== "toolkits" && (
-                        <Link
-                          href={
-                            tab === "forums"
-                              ? `/pro-hub/${r.slug}`
-                              : tab === "networks"
-                                ? `/pro-networks/${r.slug}`
-                                : `/courses/${r.slug}`
-                          }
-                        >
-                          View ↗
-                        </Link>
-                      )}
+                      <button onClick={() => setEditing(structuredClone(r))}>
+                        Edit
+                      </button>
+                      <Link
+                        href={
+                          tab === "forums"
+                            ? `/pro-hub/${r.slug}`
+                            : `/pro-networks/${r.slug}`
+                        }
+                      >
+                        View ↗
+                      </Link>
                     </div>
                   </td>
                 </tr>
@@ -285,70 +247,25 @@ function ContentWorkspace() {
               </p>
             )}
             <div className="admin-form-grid">
-              {tab === "toolkits" ? (
-                <>
-                  <label className="wide">
-                    Secure download URL
-                    <input
-                      required
-                      type="url"
-                      value={editing.asset?.fileUrl || ""}
-                      onChange={(e) =>
-                        setEditing({
-                          ...editing,
-                          asset: {
-                            fileName: editing.asset?.fileName || "",
-                            fileUrl: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <label className="wide">
-                    Download filename
-                    <input
-                      required
-                      value={editing.asset?.fileName || ""}
-                      onChange={(e) =>
-                        setEditing({
-                          ...editing,
-                          asset: {
-                            fileUrl: editing.asset?.fileUrl || "",
-                            fileName: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                  <p className="admin-hint wide">
-                    The existing purchase check protects downloads. Catalog
-                    pricing and descriptions remain in the platform’s toolkit
-                    catalog.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <label className="wide">
-                    Name
-                    <input
-                      required
-                      value={editing.name}
-                      onChange={(e) =>
-                        setEditing({ ...editing, name: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label className="wide">
-                    Description
-                    <textarea
-                      value={editing.description || ""}
-                      onChange={(e) =>
-                        setEditing({ ...editing, description: e.target.value })
-                      }
-                    />
-                  </label>
-                </>
-              )}
+              <label className="wide">
+                Name
+                <input
+                  required
+                  value={editing.name}
+                  onChange={(e) =>
+                    setEditing({ ...editing, name: e.target.value })
+                  }
+                />
+              </label>
+              <label className="wide">
+                Description
+                <textarea
+                  value={editing.description || ""}
+                  onChange={(e) =>
+                    setEditing({ ...editing, description: e.target.value })
+                  }
+                />
+              </label>
             </div>
             <div className="admin-actions">
               {tab === "forums" && (

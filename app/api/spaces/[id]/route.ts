@@ -243,12 +243,20 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
   }
 
+  const endedDate = new Date();
+
+  // Mark Time Out (leftAt) for all attendees who were still in the session
+  await prisma.spaceAttendance.updateMany({
+    where: { spaceId: id, leftAt: null },
+    data: { leftAt: endedDate },
+  }).catch(() => {});
+
   // Update space as ended
   const updated = await prisma.space.update({
     where: { id },
     data: {
       isLive: false,
-      endedAt: new Date(),
+      endedAt: endedDate,
     },
     include: {
       host: { select: HOST_SELECT },

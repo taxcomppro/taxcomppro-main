@@ -3,7 +3,7 @@ import { PRIVACY_REMINDER, detectSensitiveData } from "@/lib/specialists/catalog
 
 import { useState, useRef, useCallback } from "react";
 import { useAppSelector } from "@/store/hooks";
-import { Loading03Icon as Loader2, Cancel01Icon as X, Alert02Icon as AlertCircle, Calendar03Icon as Calendar, Clock01Icon as Clock, CrownIcon as Crown } from "hugeicons-react";
+import { Loading03Icon as Loader2, Cancel01Icon as X, Alert02Icon as AlertCircle, Calendar03Icon as Calendar, Clock01Icon as Clock, CrownIcon as Crown, Link01Icon } from "hugeicons-react";
 import { Image01Icon, SentIcon, Video02Icon } from "hugeicons-react";
 import type { FeedPost } from "@/components/feed/PostCard";
 import UpgradeModal from "@/components/ui/UpgradeModal";
@@ -32,6 +32,11 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
   const [video,      setVideo]      = useState<{ file: File; url: string; duration: number } | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [uploading,  setUploading]  = useState(false);
+
+  // Link state
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkText, setLinkText] = useState("");
 
   // Schedule state
   const [showScheduler, setShowScheduler] = useState(false);
@@ -90,6 +95,41 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
   const reset = () => {
     setExpanded(false); setContent(""); setPreviews([]); removeVideo();
     setShowScheduler(false); setScheduledAt(""); setScheduleError(null);
+    setShowLinkInput(false); setLinkUrl(""); setLinkText("");
+  };
+
+  const insertLink = () => {
+    let url = linkUrl.trim();
+    if (!url) return;
+    if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/")) {
+      url = "https://" + url;
+    }
+    const text = linkText.trim();
+    const snippet = text ? `[${text}](${url})` : url;
+
+    if (textRef.current) {
+      const start = textRef.current.selectionStart ?? content.length;
+      const end = textRef.current.selectionEnd ?? content.length;
+      const before = content.slice(0, start);
+      const after = content.slice(end);
+      const spacerBefore = before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n") ? " " : "";
+      const spacerAfter = after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n") ? " " : "";
+      const newContent = `${before}${spacerBefore}${snippet}${spacerAfter}${after}`;
+      setContent(newContent);
+      setTimeout(() => {
+        if (textRef.current) {
+          textRef.current.focus();
+          const newPos = start + spacerBefore.length + snippet.length + spacerAfter.length;
+          textRef.current.setSelectionRange(newPos, newPos);
+        }
+      }, 50);
+    } else {
+      setContent(prev => (prev ? `${prev} ${snippet}` : snippet));
+    }
+
+    setLinkUrl("");
+    setLinkText("");
+    setShowLinkInput(false);
   };
 
   /* ── submit (immediate or scheduled) ── */
@@ -276,6 +316,60 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                 </div>
               )}
 
+              {/* Link inserter */}
+              {showLinkInput && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Link01Icon className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-bold text-slate-800">Add Link to Post</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowLinkInput(false)}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Link URL *</label>
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={e => setLinkUrl(e.target.value)}
+                        placeholder="https://example.com"
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); insertLink(); } }}
+                        className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-slate-800 font-[inherit]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Display Text (Optional)</label>
+                      <input
+                        type="text"
+                        value={linkText}
+                        onChange={e => setLinkText(e.target.value)}
+                        placeholder="e.g. IRS Guidance, Form 8867"
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); insertLink(); } }}
+                        className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-slate-800 font-[inherit]"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-slate-400">Tip: You can also paste URLs directly into the post text!</span>
+                    <button
+                      type="button"
+                      onClick={insertLink}
+                      disabled={!linkUrl.trim()}
+                      className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
+                    >
+                      Insert Link
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Toolbar */}
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex gap-1">
@@ -300,9 +394,24 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                     Video
                   </button>
 
+                  {/* Link */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLinkInput(prev => !prev);
+                      setShowScheduler(false);
+                    }}
+                    className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition-all ${showLinkInput ? "text-blue-700 bg-blue-50" : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"}`}>
+                    <Link01Icon className="w-4 h-4 text-blue-500" />
+                    Link
+                  </button>
+
                   {/* Schedule */}
                   <button
-                    onClick={() => setShowScheduler(s => !s)}
+                    onClick={() => {
+                      setShowScheduler(s => !s);
+                      setShowLinkInput(false);
+                    }}
                     className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition-all ${showScheduler ? "text-blue-700 bg-blue-50" : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"}`}>
                     <Calendar className="w-4 h-4 text-blue-500" />
                     Schedule

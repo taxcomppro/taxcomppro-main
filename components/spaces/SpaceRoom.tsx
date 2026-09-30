@@ -58,6 +58,8 @@ import {
   UserX,
   Crown,
   Award,
+  FileSpreadsheet,
+  Download,
 } from "lucide-react";
 import { AUDIENCE_REACTIONS, AudienceReaction, LivePoll } from "@/lib/proTalks";
 import "./space-room.css";
@@ -640,9 +642,11 @@ function ReportModal({
 
 // ── Post-Session Host Summary Modal ───────────────────────────────────────────
 function SessionEndModal({
+  spaceId,
   summary,
   onClose,
 }: {
+  spaceId: string;
   summary: {
     totalAttendees: number;
     peakAttendees: number;
@@ -650,6 +654,14 @@ function SessionEndModal({
   };
   onClose: () => void;
 }) {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleExport = () => {
+    setDownloading(true);
+    window.location.href = `/api/spaces/${spaceId}/export-attendees?format=csv`;
+    setTimeout(() => setDownloading(false), 2000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
       <div className="relative w-full max-w-md bg-gradient-to-br from-[#071729] via-[#091b35] to-[#0e1112] border border-emerald-500/40 rounded-3xl p-7 shadow-2xl text-center">
@@ -690,12 +702,23 @@ function SessionEndModal({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-lime-400 via-emerald-500 to-teal-500 text-[#04111f] font-black text-sm hover:scale-[1.02] transition-all shadow-lg shadow-emerald-500/25"
-        >
-          Return to Pro Talks Hub
-        </button>
+        <div className="space-y-2.5">
+          <button
+            onClick={handleExport}
+            disabled={downloading}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-lime-400 via-emerald-400 to-teal-400 hover:from-lime-300 hover:to-emerald-300 text-[#04111f] font-black text-sm hover:scale-[1.02] transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            {downloading ? "Exporting CSV…" : "Export Member Data (CSV)"}
+          </button>
+
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-bold text-xs transition-all"
+          >
+            View Full Attendance Report
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1490,8 +1513,9 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
       {/* Post Session Summary Modal */}
       {sessionSummary && (
         <SessionEndModal
+          spaceId={space.id}
           summary={sessionSummary}
-          onClose={() => router.push("/pro-talks")}
+          onClose={onEnd}
         />
       )}
 
@@ -2033,7 +2057,10 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
 
             {/* Leave Room Button */}
             <button
-              onClick={() => router.push("/pro-talks")}
+              onClick={() => {
+                fetch(`/api/spaces/${space.id}/attendance`, { method: "PATCH" }).catch(() => {});
+                router.push("/pro-talks");
+              }}
               className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/8 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 text-xs font-semibold transition-all"
             >
               <PhoneOff01Icon className="w-4 h-4" /> Leave

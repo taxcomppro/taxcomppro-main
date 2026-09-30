@@ -76,9 +76,51 @@ html:not(.dark) .fp-filters button[aria-pressed="true"] {
   background: #ffbe24;
   border-color: #ffbe24;
 }
-html:not(.dark) .fp-filters button:hover {
-  color: #ffbe24;
+html:not(.dark) .fp-secondary {
+  background: #fff;
+  color: #0a1628;
+  border-color: #e2e8f0;
+}
+html:not(.dark) .fp-secondary:hover {
+  background: #f8fafc;
   border-color: #ffbe24;
+  color: #ffbe24;
+}
+html:not(.dark) .fp-photo-filter-pill {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+html:not(.dark) .fp-photo-filter-pill:hover {
+  border-color: #ffbe24;
+  color: #ffbe24;
+}
+html:not(.dark) .fp-photo-filter-pill.active {
+  color: #0a1628;
+  background: #fef3c7;
+  border-color: #ffbe24;
+}
+html:not(.dark) .fp-photo-pill-indicator {
+  background: #e2e8f0;
+  color: #64748b;
+}
+html:not(.dark) .fp-photo-filter-pill.active .fp-photo-pill-indicator {
+  background: #ffbe24;
+  color: #0a1628;
+}
+html:not(.dark) .fp-photo-toggle-inline {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+html:not(.dark) .fp-photo-toggle-inline:hover {
+  border-color: #ffbe24;
+  color: #ffbe24;
+}
+html:not(.dark) .fp-photo-toggle-inline.active {
+  background: #fef3c7;
+  border-color: #ffbe24;
+  color: #0a1628;
 }
 html:not(.dark) .fp-grid-switcher {
   background: #f1f5f9;

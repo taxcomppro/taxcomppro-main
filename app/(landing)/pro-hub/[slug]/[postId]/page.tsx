@@ -7,6 +7,7 @@ import {
   ArrowUp, ArrowDown, MessageSquare, ChevronLeft,
   Loader2, Send, Trash2, CornerDownRight,
 } from "lucide-react";
+import LinkifiedText from "@/components/ui/LinkifiedText";
 
 interface Author { id: string; name: string; image: string | null; headline?: string | null; }
 
@@ -105,7 +106,9 @@ function Comment({ c, slug, postId, onReply, onDelete, depth = 0 }: {
             <span className="font-bold text-[#0a1628] text-xs">{c.author.name}</span>
             <span className="text-[10px] text-slate-400">{timeAgo(c.createdAt)}</span>
           </div>
-          <p className="text-sm text-slate-600 mt-1 leading-relaxed whitespace-pre-wrap break-words">{c.body}</p>
+          <div className="text-sm text-slate-600 mt-1 leading-relaxed whitespace-pre-wrap break-words">
+            <LinkifiedText text={c.body} />
+          </div>
           <div className="flex items-center gap-3 mt-1.5">
             {user && depth < 2 && (
               <button onClick={() => setShowReply(v => !v)}
@@ -273,7 +276,9 @@ export default function DiscussionPage({ params }: { params: Promise<{ slug: str
               </div>
 
               <h1 className="text-xl font-black text-[#0a1628] mb-3 leading-snug">{post.title}</h1>
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{post.body}</p>
+              <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                <LinkifiedText text={post.body} />
+              </div>
 
               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-50">
                 <span className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">

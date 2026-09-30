@@ -14,7 +14,9 @@ import {
   SentIcon,
   RefreshIcon,
   Search01Icon,
+  Link01Icon,
 } from "hugeicons-react";
+import LinkifiedText from "@/components/ui/LinkifiedText";
 
 export type Knowledge = {
   id?: string;
@@ -121,6 +123,25 @@ const KNOWLEDGE_TEMPLATES = [
   },
 ];
 
+const SAMPLE_MANUAL_TEMPLATES = [
+  {
+    label: "IRS Form 8867 Due Diligence Reminder",
+    content: "Tax preparers: Form 8867 due diligence is not optional when claiming EITC, CTC, or Head of Household status.\n\nAlways ask probing questions and retain your supporting verification notes for at least 3 years.\n\nReview the latest IRS guidance: [IRS Form 8867 Details](https://www.irs.gov/forms-pubs/about-form-8867)\n\nWhat is your firm's standard intake process for verifying qualifying child residency?",
+  },
+  {
+    label: "Schedule C Substantiation & Record Reconstruction",
+    content: "When Schedule C clients come in with missing receipts, bank statements and third-party vendor logs are your best starting point.\n\nRemember: The Cohan rule allows reasonable estimates for general expenses, but strict § 274(d) substantiation is required for meals, travel, and listed property.\n\nHow do you handle client record reconstruction during crunch periods?",
+  },
+  {
+    label: "Tax Practice Growth & Advisory Packaging",
+    content: "Transitioning from 1040 volume preparation to monthly tax planning and compliance advisory can double your firm's average revenue per client.\n\nStart by offering proactive quarterly tax reviews and audit-readiness checkups.\n\nWhat is the biggest roadblock you face when raising your tax fees?",
+  },
+  {
+    label: "IRS Notice & Audit Defense Protocol",
+    content: "Receiving an IRS CP2000 or audit inquiry requires quick, methodical action.\n\nNever send the IRS original records — always submit organized copies with a clear reconciliation cover letter and Form 2848 Power of Attorney.\n\nWhat is your go-to workflow when a client receives an unexpected IRS letter?",
+  },
+];
+
 export default function SpecialistsAdmin() {
   const [data, setData] = useState<Data | null>(null);
   const [editing, setEditing] = useState<Bot | null>(null);
@@ -147,20 +168,42 @@ export default function SpecialistsAdmin() {
   const [activityBotFilter, setActivityBotFilter] = useState("ALL");
   const [activityStatusFilter, setActivityStatusFilter] = useState("ALL");
 
+  // Manual Specialist Post Modal State
+  const [manualPostOpen, setManualPostOpen] = useState(false);
+  const [manualSpecialistId, setManualSpecialistId] = useState("");
+  const [manualDestination, setManualDestination] = useState<"FEED" | "GROUP" | "FORUM" | "NETWORK">("FEED");
+  const [manualDestinationId, setManualDestinationId] = useState<string>("");
+  const [manualContent, setManualContent] = useState("");
+  const [manualLinkUrl, setManualLinkUrl] = useState("");
+  const [manualLinkText, setManualLinkText] = useState("");
+  const [showManualLinkHelper, setShowManualLinkHelper] = useState(false);
+
+  // Draft Editor Link Helper State
+  const [draftLinkUrl, setDraftLinkUrl] = useState("");
+  const [draftLinkText, setDraftLinkText] = useState("");
+  const [showDraftLinkHelper, setShowDraftLinkHelper] = useState(false);
+
   const closeDialog = useCallback(() => {
     setEditing(null);
     setDraft(null);
     setTestAnswer(null);
     setTestQuestion("");
+    setManualPostOpen(false);
+    setShowManualLinkHelper(false);
+    setShowDraftLinkHelper(false);
   }, []);
 
-  useAdminDialog(!!editing || !!draft, closeDialog);
+  useAdminDialog(!!editing || !!draft || manualPostOpen, closeDialog);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/admin/specialists");
     if (!r.ok) throw new Error("Could not load specialists.");
-    setData(await r.json());
-  }, []);
+    const json = await r.json();
+    setData(json);
+    if (json.bots?.length && !manualSpecialistId) {
+      setManualSpecialistId(json.bots[0].id);
+    }
+  }, [manualSpecialistId]);
 
   useEffect(() => {
     void load().catch((e) => setError(e.message));
@@ -201,6 +244,95 @@ export default function SpecialistsAdmin() {
       setBusy(false);
     }
   }
+
+  async function handleManualPost(publishNow: boolean) {
+    if (!manualContent.trim()) {
+      setError("Please enter post content.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const r = await fetch("/api/admin/specialists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "manualPost",
+          specialistId: manualSpecialistId,
+          content: manualContent.trim(),
+          destination: manualDestination,
+          destinationId: manualDestinationId || null,
+          publishNow,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not complete action");
+      await load();
+      setManualPostOpen(false);
+      setManualContent("");
+      setManualLinkUrl("");
+      setManualLinkText("");
+      setShowManualLinkHelper(false);
+      const specialistName = data?.bots.find((b) => b.id === manualSpecialistId)?.user.name || "specialist";
+      setNotice(
+        publishNow
+          ? `Post published live as ${specialistName}!`
+          : `Draft post saved to activity queue for review.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create specialist post");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openManualPostModal = (bot?: Bot) => {
+    if (bot) {
+      setManualSpecialistId(bot.id);
+      setManualDestination(bot.destination || "FEED");
+      setManualDestinationId(bot.destinationId || "");
+    } else if (data?.bots.length) {
+      const first = data.bots[0];
+      setManualSpecialistId(first.id);
+      setManualDestination(first.destination || "FEED");
+      setManualDestinationId(first.destinationId || "");
+    }
+    setManualContent("");
+    setShowManualLinkHelper(false);
+    setManualPostOpen(true);
+  };
+
+  const insertManualLink = () => {
+    let url = manualLinkUrl.trim();
+    if (!url) return;
+    if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/")) {
+      url = "https://" + url;
+    }
+    const text = manualLinkText.trim();
+    const snippet = text ? `[${text}](${url})` : url;
+    setManualContent((prev) => (prev ? `${prev} ${snippet}` : snippet));
+    setManualLinkUrl("");
+    setManualLinkText("");
+    setShowManualLinkHelper(false);
+  };
+
+  const insertDraftLink = () => {
+    let url = draftLinkUrl.trim();
+    if (!url || !draft) return;
+    if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/")) {
+      url = "https://" + url;
+    }
+    const text = draftLinkText.trim();
+    const snippet = text ? `[${text}](${url})` : url;
+    setDraft({
+      ...draft,
+      content: draft.content ? `${draft.content} ${snippet}` : snippet,
+    });
+    setDraftLinkUrl("");
+    setDraftLinkText("");
+    setShowDraftLinkHelper(false);
+  };
 
   async function save() {
     if (!editing) return;
@@ -288,6 +420,13 @@ export default function SpecialistsAdmin() {
         ? data?.forums
         : data?.networks;
 
+  const manualDestinations =
+    manualDestination === "GROUP"
+      ? data?.groups
+      : manualDestination === "FORUM"
+        ? data?.forums
+        : data?.networks;
+
   const filteredKnowledge = (editing?.knowledge || []).filter((k) => {
     const matchesSearch =
       !knowledgeSearch ||
@@ -307,6 +446,8 @@ export default function SpecialistsAdmin() {
     return matchesBot && matchesStatus;
   });
 
+  const selectedManualBot = data?.bots.find((b) => b.id === manualSpecialistId);
+
   return (
     <div className="admin-workspace">
       <header className="admin-page-heading">
@@ -314,7 +455,7 @@ export default function SpecialistsAdmin() {
           <span className="admin-eyebrow">INTELLIGENCE & COMMUNITY</span>
           <h1>AI Specialist Control Center</h1>
           <p>
-            Control posting schedules, feed custom tax knowledge, refine personas, and monitor live activities.
+            Control posting schedules, feed custom tax knowledge, manually publish through specialist profiles, and monitor live activities.
           </p>
         </div>
         <SparklesIcon size={38} />
@@ -349,7 +490,7 @@ export default function SpecialistsAdmin() {
                   data.providers.claude && "Claude",
                 ]
                   .filter(Boolean)
-                  .join(" + ") || "None"}
+                  .join(" + ") || "None (Manual Mode Ready)"}
               </strong>
             </div>
             <div>
@@ -371,6 +512,27 @@ export default function SpecialistsAdmin() {
           <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "20px", flexWrap: "wrap" }}>
             <button
               disabled={busy}
+              onClick={() => openManualPostModal()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "#ffbe24",
+                color: "#0f172a",
+                border: "none",
+                padding: "9px 18px",
+                borderRadius: "10px",
+                fontSize: "13px",
+                fontWeight: 800,
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(255, 190, 36, 0.25)",
+              }}
+            >
+              ✍️ Post Manually as Specialist
+            </button>
+
+            <button
+              disabled={busy}
               onClick={() => action("runSchedule")}
               style={{
                 display: "inline-flex",
@@ -378,7 +540,7 @@ export default function SpecialistsAdmin() {
                 gap: "7px",
                 background: "var(--a-inner)",
                 border: "1px solid var(--a-line)",
-                padding: "8px 14px",
+                padding: "9px 14px",
                 borderRadius: "10px",
                 fontSize: "12px",
                 fontWeight: 700,
@@ -387,6 +549,7 @@ export default function SpecialistsAdmin() {
             >
               <RefreshIcon size={15} /> Run Cron Schedule Now
             </button>
+
             {!data.bots.length && (
               <button
                 className="admin-primary"
@@ -433,19 +596,26 @@ export default function SpecialistsAdmin() {
                       <Settings01Icon size={16} /> Manage
                     </button>
                     <button
+                      disabled={busy}
+                      onClick={() => openManualPostModal(b)}
+                      title="Write and publish a custom post as this specialist"
+                      style={{ color: "#ffbe24", fontWeight: 700 }}
+                    >
+                      ✍️ Write Post
+                    </button>
+                    <button
                       disabled={busy || !b.enabled}
                       onClick={() => action("draft", b.id)}
-                      title="Generate a draft for review"
+                      title="Generate an AI draft for review"
                     >
-                      Draft
+                      AI Draft
                     </button>
                     <button
                       disabled={busy || !b.enabled}
                       onClick={() => action("postNow", b.id)}
-                      title="Generate and publish live immediately"
-                      style={{ color: "#ffbe24" }}
+                      title="Generate and publish live immediately via AI"
                     >
-                      Post Now
+                      AI Post Now
                     </button>
                     <Link
                       aria-label={`View ${b.user.name}`}
@@ -463,12 +633,31 @@ export default function SpecialistsAdmin() {
           <section className="admin-panel" style={{ marginTop: "32px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", marginBottom: "16px" }}>
               <div>
-                <h2>Activity & Publishing Queue</h2>
+                <h2>Activity &amp; Publishing Queue</h2>
                 <p>Review generated drafts, inspect AI responses, publish to community feeds, or discard.</p>
               </div>
 
               {/* Filters */}
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                <button
+                  disabled={busy}
+                  onClick={() => openManualPostModal()}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    background: "var(--a-inner)",
+                    border: "1px solid #ffbe24",
+                    color: "#ffbe24",
+                    padding: "6px 12px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    fontWeight: 750,
+                    cursor: "pointer",
+                  }}
+                >
+                  + New Specialist Post
+                </button>
                 <select
                   value={activityBotFilter}
                   onChange={(e) => setActivityBotFilter(e.target.value)}
@@ -500,7 +689,7 @@ export default function SpecialistsAdmin() {
                   <article key={a.id}>
                     <div>
                       <strong>{botMatch?.user.name || a.specialistId}</strong>
-                      <span className={`admin-status ${a.status === "PUBLISHED" ? "" : a.status === "DRAFT" ? "paused" : ""}`}>
+                      <span className={`admin-status ${a.status === "PUBLISHED" ? "" : a.status === "DRAFT" ? "paused" : "failed"}`}>
                         {a.status}
                       </span>
                       <small>
@@ -509,9 +698,13 @@ export default function SpecialistsAdmin() {
                       </small>
                     </div>
 
-                    <p className="admin-activity-text">
-                      {a.error ? `Error: ${a.error}` : a.content || "Generating content…"}
-                    </p>
+                    <div className="admin-activity-text">
+                      {a.error ? (
+                        <span style={{ color: "#ef4444" }}>Error: {a.error}</span>
+                      ) : (
+                        <LinkifiedText text={a.content || "Generating content…"} />
+                      )}
+                    </div>
 
                     <div className="admin-actions">
                       {a.status === "DRAFT" && (
@@ -527,6 +720,15 @@ export default function SpecialistsAdmin() {
                             <SentIcon size={14} /> Publish Now
                           </button>
                         </>
+                      )}
+                      {a.status === "FAILED" && (
+                        <button
+                          disabled={busy}
+                          onClick={() => setDraft({ ...a, content: a.content || `Tax insight from ${botMatch?.user.name || "specialist"}: ` })}
+                          style={{ color: "#ffbe24", borderColor: "#ffbe2440" }}
+                        >
+                          ✏️ Edit &amp; Publish
+                        </button>
                       )}
                       {["DRAFT", "FAILED"].includes(a.status) && (
                         <button
@@ -554,6 +756,235 @@ export default function SpecialistsAdmin() {
             </div>
           </section>
         </>
+      )}
+
+      {/* Manual Post as Specialist Dialog */}
+      {manualPostOpen && (
+        <div className="admin-dialog-backdrop">
+          <section
+            className="admin-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Create post as specialist"
+            style={{ width: "min(720px, 96vw)", maxHeight: "90vh" }}
+          >
+            <header style={{ borderBottom: "1px solid var(--a-line)", paddingBottom: "14px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                {selectedManualBot && (
+                  <img
+                    src={selectedManualBot.user.image || "/Atlas.jpg"}
+                    alt=""
+                    style={{ width: "42px", height: "42px", borderRadius: "10px", objectFit: "cover", border: "2px solid #ffbe24" }}
+                  />
+                )}
+                <div>
+                  <h2 style={{ fontSize: "18px", margin: 0 }}>✍️ Write Post as AI Specialist</h2>
+                  <span style={{ fontSize: "12px", color: "var(--a-gold)" }}>
+                    Post directly under an official AI specialist identity to feed, groups, or forums
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setManualPostOpen(false)} disabled={busy} style={{ background: "transparent", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--a-muted)" }}>
+                ✕
+              </button>
+            </header>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* Specialist & Destination Selectors */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: "12px", fontWeight: 700 }}>
+                  Select Specialist Profile:
+                  <select
+                    value={manualSpecialistId}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setManualSpecialistId(nextId);
+                      const match = data?.bots.find((b) => b.id === nextId);
+                      if (match) {
+                        setManualDestination(match.destination || "FEED");
+                        setManualDestinationId(match.destinationId || "");
+                      }
+                    }}
+                    style={{ padding: "8px 12px", borderRadius: "8px", background: "var(--a-inner)", border: "1px solid var(--a-line)", fontSize: "13px" }}
+                  >
+                    {data?.bots.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.user.name} ({b.title})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: "12px", fontWeight: 700 }}>
+                  Publish Destination:
+                  <select
+                    value={manualDestination}
+                    onChange={(e) => {
+                      setManualDestination(e.target.value as any);
+                      setManualDestinationId("");
+                    }}
+                    style={{ padding: "8px 12px", borderRadius: "8px", background: "var(--a-inner)", border: "1px solid var(--a-line)", fontSize: "13px" }}
+                  >
+                    <option value="FEED">Main Community Feed</option>
+                    <option value="GROUP">Community Group</option>
+                    <option value="FORUM">Pro Hub / Forum</option>
+                    <option value="NETWORK">Pro Network</option>
+                  </select>
+                </label>
+              </div>
+
+              {manualDestination !== "FEED" && (
+                <label style={{ display: "flex", flexDirection: "column", gap: "5px", fontSize: "12px", fontWeight: 700 }}>
+                  Select Specific {manualDestination === "GROUP" ? "Group" : manualDestination === "FORUM" ? "Forum" : "Network"}:
+                  <select
+                    value={manualDestinationId}
+                    onChange={(e) => setManualDestinationId(e.target.value)}
+                    style={{ padding: "8px 12px", borderRadius: "8px", background: "var(--a-inner)", border: "1px solid var(--a-line)", fontSize: "13px" }}
+                  >
+                    <option value="">Select target space...</option>
+                    {manualDestinations?.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {/* Sample Templates */}
+              <div style={{ background: "var(--a-inner)", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--a-line)" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--a-gold)", display: "block", marginBottom: "6px" }}>
+                  💡 Load Sample Post Template:
+                </span>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  {SAMPLE_MANUAL_TEMPLATES.map((tmpl, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setManualContent(tmpl.content)}
+                      style={{ padding: "4px 8px", borderRadius: "6px", background: "var(--a-panel)", border: "1px solid var(--a-line)", fontSize: "11px", cursor: "pointer" }}
+                    >
+                      {tmpl.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Post Content Area */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <label htmlFor="manual-post-textarea" style={{ fontSize: "12px", fontWeight: 700 }}>
+                    Post Content &amp; Guidance
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualLinkHelper((v) => !v)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      background: showManualLinkHelper ? "#3b82f620" : "transparent",
+                      border: "1px solid #3b82f650",
+                      color: "#3b82f6",
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Link01Icon size={13} /> Add Clickable Link
+                  </button>
+                </div>
+
+                {/* Link Helper Popover */}
+                {showManualLinkHelper && (
+                  <div style={{ background: "var(--a-inner)", border: "1px solid #3b82f640", borderRadius: "10px", padding: "10px", marginBottom: "8px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      type="url"
+                      placeholder="URL (https://irs.gov/...)"
+                      value={manualLinkUrl}
+                      onChange={(e) => setManualLinkUrl(e.target.value)}
+                      style={{ flex: 1, minWidth: "160px", padding: "6px 10px", fontSize: "12px", borderRadius: "6px" }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Display Text (optional)"
+                      value={manualLinkText}
+                      onChange={(e) => setManualLinkText(e.target.value)}
+                      style={{ flex: 1, minWidth: "140px", padding: "6px 10px", fontSize: "12px", borderRadius: "6px" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={insertManualLink}
+                      disabled={!manualLinkUrl.trim()}
+                      className="admin-primary"
+                      style={{ padding: "6px 12px", fontSize: "11.5px" }}
+                    >
+                      Insert
+                    </button>
+                  </div>
+                )}
+
+                <textarea
+                  id="manual-post-textarea"
+                  rows={6}
+                  value={manualContent}
+                  onChange={(e) => setManualContent(e.target.value)}
+                  placeholder="Write the specialist post here. Links like https://... or [Link Text](https://...) will automatically be clickable."
+                  style={{ width: "100%", fontSize: "13.5px", lineHeight: "1.6", padding: "12px", borderRadius: "10px" }}
+                />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px", fontSize: "11px", color: "var(--a-muted)" }}>
+                  <span>Tip: Markdown links [Text](URL) and raw URLs are both rendered as clickable links.</span>
+                  <span>{manualContent.length} characters</span>
+                </div>
+              </div>
+
+              {/* Live Preview */}
+              {manualContent.trim() && (
+                <div style={{ background: "var(--a-inner)", padding: "12px 14px", borderRadius: "10px", border: "1px solid var(--a-line)" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--a-gold)", display: "block", marginBottom: "4px" }}>
+                    Live Preview:
+                  </span>
+                  <div style={{ fontSize: "13px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                    <LinkifiedText text={manualContent} />
+                  </div>
+                  <small style={{ display: "block", marginTop: "8px", color: "var(--a-muted)" }}>
+                    {selectedManualBot?.user.name} · Tax Comp Pro AI Specialist
+                  </small>
+                </div>
+              )}
+            </div>
+
+            <footer style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px", paddingTop: "14px", borderTop: "1px solid var(--a-line)" }}>
+              <button
+                type="button"
+                onClick={() => setManualPostOpen(false)}
+                style={{ background: "transparent", border: "1px solid var(--a-line)", padding: "9px 16px", borderRadius: "8px", cursor: "pointer" }}
+              >
+                Cancel
+              </button>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  disabled={busy || !manualContent.trim()}
+                  onClick={() => handleManualPost(false)}
+                  style={{ background: "var(--a-inner)", border: "1px solid var(--a-line)", padding: "9px 16px", borderRadius: "8px", cursor: "pointer", fontWeight: 700, fontSize: "12.5px" }}
+                >
+                  💾 Save as Draft
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !manualContent.trim()}
+                  onClick={() => handleManualPost(true)}
+                  style={{ background: "#ffbe24", color: "#0f172a", border: "none", padding: "9px 18px", borderRadius: "8px", cursor: "pointer", fontWeight: 800, fontSize: "12.5px" }}
+                >
+                  ⚡ Publish Live Now
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
       )}
 
       {/* Comprehensive Specialist Management Dialog */}
@@ -589,13 +1020,13 @@ export default function SpecialistsAdmin() {
                 className={activeTab === "profile" ? "active" : ""}
                 onClick={() => setActiveTab("profile")}
               >
-                👤 Profile & Persona
+                👤 Profile &amp; Persona
               </button>
               <button
                 className={activeTab === "schedule" ? "active" : ""}
                 onClick={() => setActiveTab("schedule")}
               >
-                🗓️ Schedule & Posting
+                🗓️ Schedule &amp; Posting
               </button>
               <button
                 className={activeTab === "knowledge" ? "active" : ""}
@@ -607,7 +1038,7 @@ export default function SpecialistsAdmin() {
                 className={activeTab === "engine" ? "active" : ""}
                 onClick={() => setActiveTab("engine")}
               >
-                ⚙️ AI Brain & Guardrails
+                ⚙️ AI Brain &amp; Guardrails
               </button>
               <button
                 className={activeTab === "playground" ? "active" : ""}
@@ -636,7 +1067,7 @@ export default function SpecialistsAdmin() {
                   </label>
 
                   <label>
-                    Professional Title & Headline
+                    Professional Title &amp; Headline
                     <input
                       value={editing.title}
                       onChange={(e) => update({ title: e.target.value })}
@@ -792,7 +1223,7 @@ export default function SpecialistsAdmin() {
                   </div>
 
                   <label className="wide">
-                    Signature & Closing Sign-off
+                    Signature &amp; Closing Sign-off
                     <input
                       value={editing.signature}
                       onChange={(e) => update({ signature: e.target.value })}
@@ -929,22 +1360,30 @@ export default function SpecialistsAdmin() {
                   )}
 
                   {/* Instant Trigger Actions */}
-                  <div className="wide" style={{ display: "flex", gap: "10px", marginTop: "10px", borderTop: "1px solid var(--a-line)", paddingTop: "16px" }}>
+                  <div className="wide" style={{ display: "flex", gap: "10px", marginTop: "10px", borderTop: "1px solid var(--a-line)", paddingTop: "16px", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => openManualPostModal(editing)}
+                      style={{ padding: "9px 16px", borderRadius: "10px", background: "#ffbe24", color: "#0f172a", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800 }}
+                    >
+                      ✍️ Write Manual Post Now
+                    </button>
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => action("draft", editing.id)}
                       style={{ padding: "9px 16px", borderRadius: "10px", background: "var(--a-inner)", border: "1px solid var(--a-line)", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}
                     >
-                      📝 Generate Draft Now
+                      📝 Generate AI Draft
                     </button>
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => action("postNow", editing.id)}
-                      style={{ padding: "9px 16px", borderRadius: "10px", background: "#ffbe24", color: "#0f172a", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800 }}
+                      style={{ padding: "9px 16px", borderRadius: "10px", background: "var(--a-inner)", border: "1px solid var(--a-line)", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}
                     >
-                      ⚡ Post Live Now
+                      ⚡ AI Post Live Now
                     </button>
                   </div>
                 </div>
@@ -1176,7 +1615,7 @@ export default function SpecialistsAdmin() {
                   </label>
 
                   <label>
-                    Post Tone & Voice
+                    Post Tone &amp; Voice
                     <select
                       value={editing.postTone || "authoritative"}
                       onChange={(e) => update({ postTone: e.target.value })}
@@ -1226,7 +1665,7 @@ export default function SpecialistsAdmin() {
                   </label>
 
                   <label className="wide">
-                    Personality & Behavioral Instructions
+                    Personality &amp; Behavioral Instructions
                     <textarea
                       value={editing.personality}
                       onChange={(e) => update({ personality: e.target.value })}
@@ -1235,7 +1674,7 @@ export default function SpecialistsAdmin() {
                   </label>
 
                   <label className="wide">
-                    Boundaries & Safety Constraints (What bot must NEVER say)
+                    Boundaries &amp; Safety Constraints (What bot must NEVER say)
                     <textarea
                       value={editing.boundaries}
                       onChange={(e) => update({ boundaries: e.target.value })}
@@ -1362,34 +1801,110 @@ export default function SpecialistsAdmin() {
             role="dialog"
             aria-modal="true"
             aria-label="Edit draft"
+            style={{ width: "min(720px, 96vw)", maxHeight: "90vh" }}
           >
-            <header>
-              <h2>Edit Generated Draft</h2>
+            <header style={{ borderBottom: "1px solid var(--a-line)", paddingBottom: "14px", marginBottom: "14px" }}>
+              <h2>Edit &amp; Publish Specialist Post</h2>
               <button onClick={() => setDraft(null)}>✕</button>
             </header>
-            <textarea
-              aria-label="Draft content"
-              rows={10}
-              value={draft.content}
-              onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-              style={{ fontSize: "14px", lineHeight: "1.6" }}
-            />
-            <div className="admin-actions" style={{ marginTop: "16px" }}>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: "var(--a-muted)" }}>
+                  Specialist: <strong>{data?.bots.find((b) => b.id === draft.specialistId)?.user.name || draft.specialistId}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowDraftLinkHelper((v) => !v)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: showDraftLinkHelper ? "#3b82f620" : "transparent",
+                    border: "1px solid #3b82f650",
+                    color: "#3b82f6",
+                    padding: "4px 10px",
+                    borderRadius: "6px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Link01Icon size={13} /> Add Clickable Link
+                </button>
+              </div>
+
+              {/* Link Helper Popover */}
+              {showDraftLinkHelper && (
+                <div style={{ background: "var(--a-inner)", border: "1px solid #3b82f640", borderRadius: "10px", padding: "10px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="url"
+                    placeholder="URL (https://irs.gov/...)"
+                    value={draftLinkUrl}
+                    onChange={(e) => setDraftLinkUrl(e.target.value)}
+                    style={{ flex: 1, minWidth: "160px", padding: "6px 10px", fontSize: "12px", borderRadius: "6px" }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Display Text (optional)"
+                    value={draftLinkText}
+                    onChange={(e) => setDraftLinkText(e.target.value)}
+                    style={{ flex: 1, minWidth: "140px", padding: "6px 10px", fontSize: "12px", borderRadius: "6px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={insertDraftLink}
+                    disabled={!draftLinkUrl.trim()}
+                    className="admin-primary"
+                    style={{ padding: "6px 12px", fontSize: "11.5px" }}
+                  >
+                    Insert
+                  </button>
+                </div>
+              )}
+
+              <textarea
+                aria-label="Draft content"
+                rows={9}
+                value={draft.content}
+                onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+                style={{ fontSize: "14px", lineHeight: "1.6", width: "100%", padding: "12px", borderRadius: "10px" }}
+                placeholder="Write or edit specialist post content..."
+              />
+
+              {draft.content?.trim() && (
+                <div style={{ background: "var(--a-inner)", padding: "10px 12px", borderRadius: "10px", border: "1px solid var(--a-line)" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--a-gold)", display: "block", marginBottom: "4px" }}>
+                    Live Preview:
+                  </span>
+                  <div style={{ fontSize: "12.5px", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                    <LinkifiedText text={draft.content} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="admin-actions" style={{ marginTop: "18px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button onClick={() => setDraft(null)} style={{ background: "transparent", border: "1px solid var(--a-line)", padding: "8px 16px", borderRadius: "8px" }}>
+                Cancel
+              </button>
               <button
-                disabled={busy}
+                disabled={busy || !draft.content.trim()}
                 className="admin-primary"
                 onClick={() => action("editDraft", draft.id, { content: draft.content })}
               >
                 Save Draft
               </button>
               <button
-                disabled={busy}
-                onClick={() => action("publish", draft.id)}
-                style={{ background: "#10b981", color: "#fff", border: "none" }}
+                disabled={busy || !draft.content.trim()}
+                onClick={async () => {
+                  await action("editDraft", draft.id, { content: draft.content });
+                  await action("publish", draft.id);
+                }}
+                style={{ background: "#10b981", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}
               >
-                Publish Now
+                <SentIcon size={14} /> Publish Live Now
               </button>
-              <button onClick={() => setDraft(null)}>Cancel</button>
             </div>
           </section>
         </div>

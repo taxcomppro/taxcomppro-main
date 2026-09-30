@@ -53,7 +53,6 @@ const adminLinks: NavLink[] = [
   { icon: BarChart2,       label: "Analytics",         href: "/admin/analytics" },
   { icon: Calendar,        label: "Content Calendar",  href: "/admin/content-calendar" },
   { icon: Images,          label: "Media Gallery",     href: "/admin/media-gallery" },
-  { icon: Gift,            label: "Affiliate",         href: "/admin/affiliate" },
   { icon: Bot,             label: "Atlas AI",          href: "/admin/atlas" },
   { icon: LifeBuoy,        label: "Support Tickets",   href: "/admin/support" },
 ];

@@ -11,6 +11,7 @@ import {
   Location01Icon,
   Tick01Icon,
   Briefcase01Icon,
+  Image01Icon,
 } from "hugeicons-react";
 import { ProCard, type ProData } from "@/components/pros/ProCard";
 import {
@@ -52,10 +53,12 @@ export default function FindAProPage() {
   const [query, setQuery] = useState("");
   const [credential, setCredential] = useState("");
   const [location, setLocation] = useState("");
+  const [onlyWithPhotos, setOnlyWithPhotos] = useState(true);
   const [sort, setSort] = useState("recent");
   const [viewMode, setViewMode] = useGridView("fp-grid-view", "grid-4", ["grid-4", "grid-3", "grid-2", "list"]);
   const results = useRef<HTMLDivElement>(null);
   const search = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
@@ -96,6 +99,7 @@ export default function FindAProPage() {
     void load();
     return () => controller.abort();
   }, [retry]);
+
   const locations = useMemo(
     () =>
       Array.from(
@@ -107,6 +111,10 @@ export default function FindAProPage() {
       ).sort((a, b) => a.localeCompare(b)),
     [pros],
   );
+
+  const hasPhoto = (pro: ProData) =>
+    Boolean(pro.image && typeof pro.image === "string" && pro.image.trim().length > 0);
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     const pattern = FILTERS.find(
@@ -121,7 +129,11 @@ export default function FindAProPage() {
         ]
           .filter(Boolean)
           .join(" ");
+
+        const matchesPhoto = !onlyWithPhotos || hasPhoto(pro);
+
         return (
+          matchesPhoto &&
           (!term ||
             `${pro.name} ${pro.location || ""} ${professionalText}`
               .toLowerCase()
@@ -137,13 +149,17 @@ export default function FindAProPage() {
             ? (b.yearsExperience ?? -1) - (a.yearsExperience ?? -1)
             : 0,
       );
-  }, [pros, query, credential, location, sort]);
-  const hasFilters = !!(query || credential || location);
+  }, [pros, query, credential, location, onlyWithPhotos, sort]);
+
+  const hasFilters = Boolean(query || credential || location || !onlyWithPhotos);
+
   function reset() {
     setQuery("");
     setCredential("");
     setLocation("");
+    setOnlyWithPhotos(true);
   }
+
   return (
     <div className="fp-page">
       <div className="fp-container">
@@ -288,20 +304,50 @@ export default function FindAProPage() {
                 ))}
               </select>
             </label>
-          </div>
-          <div
-            className="fp-filters"
-            aria-label="Filter by professional expertise"
-          >
-            {FILTERS.map((filter) => (
-              <button
-                key={filter.value}
-                aria-pressed={credential === filter.value}
-                onClick={() => setCredential(filter.value)}
+            <label className="fp-location fp-photo-filter-select">
+              <Image01Icon size={18} />
+              <select
+                aria-label="Filter by profile photo"
+                value={onlyWithPhotos ? "photo" : "all"}
+                onChange={(event) => setOnlyWithPhotos(event.target.value === "photo")}
               >
-                {filter.label}
-              </button>
-            ))}
+                <option value="photo">With photo only (Default)</option>
+                <option value="all">All profiles (show all)</option>
+              </select>
+            </label>
+          </div>
+          <div className="fp-filters-bar">
+            <div
+              className="fp-filters"
+              aria-label="Filter by professional expertise"
+            >
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
+                  aria-pressed={credential === filter.value}
+                  onClick={() => setCredential(filter.value)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`fp-photo-filter-pill ${onlyWithPhotos ? "active" : ""}`}
+              onClick={() => setOnlyWithPhotos(!onlyWithPhotos)}
+              aria-pressed={onlyWithPhotos}
+              title={
+                onlyWithPhotos
+                  ? "Currently showing profiles with photos only. Click to view all profiles."
+                  : "Currently showing all profiles. Click to show only profiles with photos."
+              }
+            >
+              <Image01Icon size={15} />
+              <span>{onlyWithPhotos ? "With photo only" : "All profiles"}</span>
+              <span className="fp-photo-pill-indicator">
+                {onlyWithPhotos ? "ON" : "OFF"}
+              </span>
+            </button>
           </div>
           <div className="fp-results-bar">
             <div aria-live="polite">
@@ -312,7 +358,8 @@ export default function FindAProPage() {
               </strong>
               {!loading && (
                 <span>
-                  {hasFilters ? " matching your search" : " ready to explore"}
+                  {onlyWithPhotos ? " with profile photos" : " (all profiles)"}
+                  {(query || credential || location) ? " matching your search" : " ready to explore"}
                 </span>
               )}
               {hasFilters && (
@@ -322,6 +369,15 @@ export default function FindAProPage() {
               )}
             </div>
             <div className="fp-view-controls">
+              <button
+                type="button"
+                className={`fp-photo-toggle-inline ${onlyWithPhotos ? "active" : ""}`}
+                onClick={() => setOnlyWithPhotos(!onlyWithPhotos)}
+                title={onlyWithPhotos ? "Showing profiles with photos. Click to show all." : "Showing all profiles. Click to filter by photo only."}
+              >
+                <Image01Icon size={13} />
+                <span>{onlyWithPhotos ? "Photos only" : "All profiles"}</span>
+              </button>
               <label>
                 Sort by
                 <select
@@ -371,14 +427,24 @@ export default function FindAProPage() {
                   ? "Try a broader search, a different specialty, or another location."
                   : "Check back as new professionals join the directory."}
               </p>
-              {hasFilters && (
-                <button className="fp-button fp-primary" onClick={reset}>
-                  Explore all professionals{" "}
-                  <span className="fp-arrow">
-                    <ArrowRight01Icon size={17} />
-                  </span>
-                </button>
-              )}
+              <div className="fp-empty-actions">
+                {onlyWithPhotos && pros.length > 0 && (
+                  <button
+                    className="fp-button fp-secondary"
+                    onClick={() => setOnlyWithPhotos(false)}
+                  >
+                    Show all {pros.length} professionals (including without photo)
+                  </button>
+                )}
+                {hasFilters && (
+                  <button className="fp-button fp-primary" onClick={reset}>
+                    Explore all professionals{" "}
+                    <span className="fp-arrow">
+                      <ArrowRight01Icon size={17} />
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div

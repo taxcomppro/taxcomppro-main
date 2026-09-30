@@ -327,7 +327,7 @@ export async function generateActivity(
 export async function publishActivity(id: string) {
   return prisma.$transaction(async (tx) => {
     const claimed = await tx.aiActivity.updateMany({
-      where: { id, status: "DRAFT" },
+      where: { id, status: { in: ["DRAFT", "FAILED"] } },
       data: { status: "PUBLISHING" },
     });
     if (!claimed.count)
@@ -336,10 +336,13 @@ export async function publishActivity(id: string) {
       where: { id },
       include: { specialist: { include: { user: true } } },
     });
-    if (!job.specialist.enabled) throw new Error("Specialist is paused.");
     const authorId = job.specialist.userId;
-    const body = job.kind === "POST" ? formatSpecialistPost(job.content) : formatSpecialistText(job.content);
-    const content = `${body}\n\n${job.specialist.user.name} · ${AI_LABEL}`;
+    const rawBody = (job.content || "").trim();
+    const body = job.provider === "manual"
+      ? rawBody
+      : (job.kind === "POST" ? formatSpecialistPost(rawBody) : formatSpecialistText(rawBody));
+    const labelSuffix = `${job.specialist.user.name} · ${AI_LABEL}`;
+    const content = body.includes(labelSuffix) ? body : `${body}\n\n${labelSuffix}`;
     let url = "";
     if (job.kind === "REPLY" && job.parentId && job.destination === "NETWORK") {
       const parent = await tx.proNetworkDiscussion.findUniqueOrThrow({

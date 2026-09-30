@@ -11,6 +11,7 @@ import DueDiligenceBadge from "@/components/badges/DueDiligenceBadge";
 import UpgradeModal from "@/components/ui/UpgradeModal";
 import FeedVideoPlayer from "./FeedVideoPlayer";
 import PostLikesModal from "./PostLikesModal";
+import LinkifiedText from "@/components/ui/LinkifiedText";
 
 interface Author {
   id: string; profileSlug?: string | null; name: string; image: string | null;
@@ -243,7 +244,9 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
           </div>
         ) : (
           <>
-            <p className="text-base text-slate-700 leading-relaxed whitespace-pre-wrap">{displayText}</p>
+            <div className="text-base text-slate-700 leading-relaxed whitespace-pre-wrap">
+              <LinkifiedText text={displayText} />
+            </div>
             {isLong && (
               <button onClick={() => setExpanded(e => !e)} className="text-xs font-semibold text-[#0a1628] mt-1 hover:underline">
                 {expanded ? "Show less" : "…see more"}
@@ -259,7 +262,9 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
             {post.originalPost.author.image ? <img src={post.originalPost.author.image} alt="" loading="lazy" /> : <span className="feed-original-initial">{post.originalPost.author.name[0]}</span>}
             <span><strong>{post.originalPost.author.name}</strong>{post.originalPost.author.aiSpecialist && <small>Tax Comp Pro AI Specialist</small>}<small>{timeAgo(post.originalPost.createdAt)}{post.originalPost.community ? ` · ${post.originalPost.community.name}` : " · Public post"}</small></span>
           </Link>
-          <p className="whitespace-pre-wrap break-words">{post.originalPost.content.length > 500 ? `${post.originalPost.content.slice(0,500)}…` : post.originalPost.content}</p>
+          <div className="whitespace-pre-wrap break-words text-slate-700">
+            <LinkifiedText text={post.originalPost.content.length > 500 ? `${post.originalPost.content.slice(0,500)}…` : post.originalPost.content} />
+          </div>
           {post.originalPost.images.length > 0 && <Link href={`/feed?post=${post.originalPost.id}`} className="feed-original-images">{post.originalPost.images.slice(0,2).map((src,i) => <img key={i} src={src} alt={`Original post image ${i+1}`} loading="lazy" />)}</Link>}
           {post.originalPost.videoUrl && <FeedVideoPlayer src={post.originalPost.videoUrl} />}
           <Link className="feed-original-link" href={`/feed?post=${post.originalPost.id}`}>View original post</Link>
@@ -351,7 +356,9 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
                   <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
                     <Link href={`/member/${c.author.profileSlug || c.author.id}`} className="feed-author-link text-sm font-bold text-[#0a1628]">{c.author.name}</Link>
                     {c.author.aiSpecialist && <span className="block text-xs text-amber-700 dark:text-amber-300">Tax Comp Pro AI Specialist</span>}
-                    <div className="text-sm text-slate-600 mt-0.5 leading-relaxed">{c.content}</div>
+                    <div className="text-sm text-slate-600 mt-0.5 leading-relaxed whitespace-pre-wrap">
+                      <LinkifiedText text={c.content} />
+                    </div>
                   </div>
                 </div>
               ))}

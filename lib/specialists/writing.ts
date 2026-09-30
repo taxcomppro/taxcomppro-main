@@ -10,7 +10,7 @@ export function formatSpecialistPost(text: string): string {
     .join("\n\n");
 }
 
-/** Plain-text surfaces must not expose model-generated Markdown decoration. */
+/** Plain-text surfaces must not expose model-generated Markdown decoration, while preserving links and URLs. */
 export function formatSpecialistText(text: string): string {
   return text
     .replace(/\r\n?/g, "\n")
@@ -20,7 +20,6 @@ export function formatSpecialistText(text: string): string {
     .replace(/__([^_]+)__/g, "$1")
     .replace(/\*([^*\n]+)\*/g, "$1")
     .replace(/`([^`\n]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)")
     .replace(/[ \t]*[\u2013\u2014][ \t]*/g, ", ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")

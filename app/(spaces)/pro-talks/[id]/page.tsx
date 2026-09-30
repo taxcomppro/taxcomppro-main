@@ -30,6 +30,7 @@ import SpaceRoom from "@/components/spaces/SpaceRoom";
 import RsvpPanel from "@/components/spaces/RsvpPanel";
 import EditTalkDialog from "@/components/spaces/EditTalkDialog";
 import HostTicketSalesModal from "@/components/spaces/HostTicketSalesModal";
+import EndedTalkAttendanceSummary from "@/components/spaces/EndedTalkAttendanceSummary";
 import { isTicketedSpace } from "@/lib/ticketedProTalks";
 import { accountUrl } from "@/lib/auth-navigation";
 import "./talk-room.css";
@@ -727,9 +728,26 @@ export default function ProTalkPage() {
     if (ending) return;
     setEnding(true);
     try {
-      await fetch(`/api/spaces/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/spaces/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok && data) {
+        setSpace((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...data,
+                isLive: false,
+                endedAt: data.endedAt || new Date().toISOString(),
+              }
+            : data
+        );
+      } else {
+        setSpace((prev) =>
+          prev ? { ...prev, isLive: false, endedAt: new Date().toISOString() } : prev
+        );
+      }
     } finally {
-      router.push("/pro-talks");
+      setEnding(false);
     }
   };
 
@@ -783,6 +801,36 @@ export default function ProTalkPage() {
         isAdmin)
   );
 
+  // Pro Talk has ended -> Show Attendance Summary with CSV Export for Host / Admin
+  if (space?.endedAt) {
+    if (isHost || isAdmin) {
+      return (
+        <EndedTalkAttendanceSummary
+          space={space}
+          isAdmin={isAdmin}
+          isHost={isHost}
+        />
+      );
+    }
+
+    return (
+      <main className="ptr-screen">
+        <span className="ptr-mic">
+          <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" priority />
+        </span>
+        <h1>This Pro Talk has concluded</h1>
+        <p className="ptr-desc">
+          Thank you for participating! Browse live and upcoming sessions in the Pro Talks directory.
+        </p>
+        <div className="ptr-actions">
+          <Link href="/pro-talks" className="ptr-btn ptr-btn--primary">
+            Browse Pro Talks
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   // If ticketed talk and attendee doesn't have a ticket yet (and is not host/co-host/admin)
   if (space && isTicketedSpace(space) && !isHost && !space.hasTicket) {
     return (
@@ -833,11 +881,11 @@ export default function ProTalkPage() {
         <span className="ptr-mic">
           <Image src="/protalk.png" alt="" fill className="object-cover" sizes="88px" priority />
         </span>
-        <h1>{space?.endedAt ? "This Pro Talk has ended" : "Pro Talk unavailable"}</h1>
+        <h1>Pro Talk unavailable</h1>
         <p className="ptr-desc">
           {error && error !== "Not found"
             ? error
-            : "It may have ended or the link is no longer valid. Browse what's live and upcoming instead."}
+            : "It may have concluded or the link is no longer valid. Browse what's live and upcoming instead."}
         </p>
         <div className="ptr-actions">
           <Link href="/pro-talks" className="ptr-btn ptr-btn--primary">
