@@ -276,9 +276,9 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
           {/* ── 1 image ── */}
           {post.images.length === 1 && (
             <button onClick={() => setLightboxIdx(0)}
-              className="block w-full rounded-xl overflow-hidden bg-slate-100 cursor-zoom-in">
+              className="block w-full overflow-hidden bg-black/5 dark:bg-black/30 cursor-zoom-in text-center flex items-center justify-center">
               <img loading="lazy" decoding="async" src={post.images[0]} alt="Post image 1"
-                className="w-full object-cover max-h-[480px] hover:opacity-95 transition-opacity" />
+                className="w-full h-auto max-h-[720px] object-contain mx-auto block hover:opacity-95 transition-opacity" />
             </button>
           )}
           {/* ── 2 images ── */}

@@ -70,8 +70,9 @@
 .feed-post-group > svg { flex-shrink:0; color:var(--feed-gold); }
 .feed-post-group > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .feed-post-time { display:inline-flex; align-items:center; gap:4px; color:var(--feed-muted); font-size:13px; margin-top:4px; text-decoration:none; }
-.feed-post-media { overflow:hidden; margin-bottom:0; }
-.feed-post-media button { border-radius:0; }
+.feed-post-media { overflow:hidden; margin-bottom:0; background:rgba(0,0,0,0.03); }
+.dark .feed-post-media { background:rgba(0,0,0,0.25); }
+.feed-post-media button { border-radius:0; border:0; background:transparent; display:flex; align-items:center; justify-content:center; }
 .feed-post-media .grid { gap:2px; }
 .feed-social-bar { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid var(--feed-line); padding:10px 16px; }
 .feed-social-actions { display:flex; align-items:center; gap:14px; min-width:0; }
