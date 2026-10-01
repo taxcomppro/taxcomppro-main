@@ -8,7 +8,7 @@ import {
   ArrowLeft01Icon as ArrowLeft, Upload01Icon as Upload, Cancel01Icon as X,
   Clock01Icon as Clock, UserGroupIcon as Users, GlobeIcon as Globe,
   BookOpen01Icon as BookOpen, Download01Icon as Download, PackageIcon as Package,
-  Briefcase01Icon as Briefcase, ShoppingBag01Icon as ShoppingBag, StructureCheckIcon as Network,
+  Briefcase01Icon as Briefcase, ShoppingBag01Icon as ShoppingBag,
   School01Icon as GraduationCap, Image01Icon as ImageIcon, Add01Icon as Plus,
   Delete02Icon as Trash2, ArrowDown01Icon as ChevronDown, ArrowRight01Icon as ChevronRight,
   Video02Icon as Video, HelpCircleIcon as HelpCircle, ArrowRight01Icon as ArrowRight,
@@ -40,12 +40,6 @@ const CATEGORIES = [
     label: "Product",
     icon: ShoppingBag,
     desc: "Downloadable guides, templates, or tools",
-  },
-  {
-    value: "NETWORK",
-    label: "Network",
-    icon: Network,
-    desc: "Referral networks or professional groups",
   },
   {
     value: "COURSE",
@@ -255,51 +249,6 @@ function ProductFields({
   );
 }
 
-function NetworkFields({
-  meta,
-  set,
-}: {
-  meta: Record<string, string>;
-  set: (k: string, v: string) => void;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <div>
-        <label className={lbl}>
-          <Users className="w-3 h-3 inline mr-1" />
-          Group Type
-        </label>
-        <select
-          className={sel}
-          value={meta.networkType ?? ""}
-          onChange={(e) => set("networkType", e.target.value)}
-        >
-          <option value="">Select…</option>
-          {[
-            "Referral Group",
-            "Mastermind",
-            "Co-Working Group",
-            "Association Chapter",
-            "Private Circle",
-            "Other",
-          ].map((o) => (
-            <option key={o}>{o}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className={lbl}>Meeting Cadence</label>
-        <input
-          className={inp}
-          placeholder="e.g. Weekly Zoom, Monthly"
-          value={meta.cadence ?? ""}
-          onChange={(e) => set("cadence", e.target.value)}
-        />
-      </div>
-    </div>
-  );
-}
-
 function CourseExternalFields({
   meta,
   set,
@@ -420,8 +369,8 @@ export default function CreateListingPage() {
     }
   };
 
-  // Listing State (for Service, Product, Network, or External Course)
-  const [category, setCategory] = useState<"SERVICE" | "PRODUCT" | "NETWORK" | "COURSE">("SERVICE");
+  // Listing State (for Service, Product, or External Course)
+  const [category, setCategory] = useState<"SERVICE" | "PRODUCT" | "COURSE">("SERVICE");
   const [courseDeliveryMode, setCourseDeliveryMode] = useState<"HOSTED" | "EXTERNAL">("HOSTED");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -909,7 +858,7 @@ export default function CreateListingPage() {
   }
 
   const canSell = !!(user && (
-    user.role === "ADMIN" || user.role === "PROFESSIONAL" ||
+    user.role === "ADMIN" ||
     user.tier === "MARKETPLACE" || user.tier === "MARKETPLACE_PLUS"
   ));
 
@@ -963,7 +912,7 @@ export default function CreateListingPage() {
               Create Marketplace Listing
             </h1>
             <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
-              Publish services, products, referral networks, or complete academy courses
+              Publish services, products, or complete academy courses
             </p>
           </div>
         </div>
@@ -2059,7 +2008,6 @@ export default function CreateListingPage() {
                 {/* Category-specific fields */}
                 {category === "SERVICE" && <ServiceFields meta={meta} set={setMetaField} />}
                 {category === "PRODUCT" && <ProductFields meta={meta} set={setMetaField} />}
-                {category === "NETWORK" && <NetworkFields meta={meta} set={setMetaField} />}
                 {category === "COURSE" && <CourseExternalFields meta={meta} set={setMetaField} />}
 
                 <div className="lc-section-heading lc-divider"><span>03</span><div><h2>Help the right people find you</h2><p>Add up to eight relevant topics or specialties.</p></div></div>

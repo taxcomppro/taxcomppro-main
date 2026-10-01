@@ -14,12 +14,12 @@ export async function PATCH(
   if (caller?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { userId } = await params;
-  const { role, tier } = await req.json();
+  const { role, tier, isBrandAmbassador } = await req.json();
 
   const updateData: any = {};
 
   if (role !== undefined) {
-    const validRoles = ["MEMBER", "PROFESSIONAL", "ADMIN"];
+    const validRoles = ["MEMBER", "ADMIN"];
     if (!validRoles.includes(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     updateData.role = role;
   }
@@ -30,6 +30,10 @@ export async function PATCH(
     updateData.tier = tier;
   }
 
+  if (isBrandAmbassador !== undefined) {
+    updateData.isBrandAmbassador = Boolean(isBrandAmbassador);
+  }
+
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: "No update fields provided" }, { status: 400 });
   }
@@ -37,7 +41,7 @@ export async function PATCH(
   const updated = await prisma.user.update({
     where: { id: userId },
     data: updateData,
-    select: { id: true, name: true, email: true, role: true, tier: true },
+    select: { id: true, name: true, email: true, role: true, tier: true, isBrandAmbassador: true },
   });
 
   return NextResponse.json(updated);

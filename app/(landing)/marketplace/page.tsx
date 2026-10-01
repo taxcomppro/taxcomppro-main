@@ -574,7 +574,6 @@ function MarketplaceContent() {
   const canSell =
     !!authed &&
     (authed.role === "ADMIN" ||
-      authed.role === "PROFESSIONAL" ||
       ["MARKETPLACE", "MARKETPLACE_PLUS"].includes(authed.tier));
   const createHref = canSell ? "/marketplace/create" : authed ? "/upgrade" : "/register";
   const createLabel = canSell ? "Create listing" : authed ? "Upgrade to sell" : "Start selling";
@@ -1063,7 +1062,7 @@ function MarketplaceContent() {
                   <Briefcase01Icon size={30} />
                 </span>
                 <h2>Start selling on Tax Compliance Pro</h2>
-                <p>Create your first service, digital product, network, or training course to reach thousands of tax pros.</p>
+                <p>Create your first service, digital product, or training course to reach thousands of tax pros.</p>
                 <Link className="mk-primary" href="/marketplace/create">
                   <Add01Icon size={18} /> Create Your First Listing
                 </Link>

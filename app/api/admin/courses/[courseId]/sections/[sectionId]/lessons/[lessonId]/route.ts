@@ -8,7 +8,7 @@ async function requireAdmin() {
   if (!session?.user) return null;
   const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (!dbUser) return null;
-  const canManage = dbUser.role === "ADMIN" || dbUser.tier === "MARKETPLACE" || dbUser.tier === "MARKETPLACE_PLUS" || dbUser.role === "PROFESSIONAL";
+  const canManage = dbUser.role === "ADMIN" || dbUser.tier === "MARKETPLACE" || dbUser.tier === "MARKETPLACE_PLUS";
   if (!canManage) return null;
   return dbUser;
 }

@@ -6,6 +6,7 @@ import { REACTIONS } from "@/lib/reactions";
 import { Cancel01Icon as X, Loading03Icon as Loader2, Search01Icon as Search } from "hugeicons-react";
 import { ThumbsUpIcon } from "hugeicons-react";
 import DueDiligenceBadge from "@/components/badges/DueDiligenceBadge";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 
 interface LikeUser {
   id: string;
@@ -15,6 +16,7 @@ interface LikeUser {
   role: string;
   tier: string;
   hasDueDiligenceBadge?: boolean;
+  isBrandAmbassador?: boolean;
 }
 
 interface LikeEntry {
@@ -208,6 +210,10 @@ export default function PostLikesModal({ postId, isOpen, onClose, initialCount }
                         <span className="font-bold text-sm text-[#0a1628] group-hover:text-blue-600 transition-colors truncate">
                           {user.name}
                         </span>
+
+                        {user.isBrandAmbassador && (
+                          <BrandAmbassadorBadge size={16} />
+                        )}
 
                         {user.hasDueDiligenceBadge && (
                           <DueDiligenceBadge size={16} showTooltip={false} />

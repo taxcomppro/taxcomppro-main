@@ -23,7 +23,7 @@ function minDateTimeLocal() {
 
 export default function PostComposer({ onPostCreated, onScheduled }: Props) {
   const user         = useAppSelector(s => s.auth.user);
-  const isFree       = (user?.tier === "FREE" || !user?.tier) && user?.role !== "ADMIN" && user?.role !== "PROFESSIONAL";
+  const isFree       = (user?.tier === "FREE" || !user?.tier) && user?.role !== "ADMIN";
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [content,    setContent]    = useState("");
   const [expanded,   setExpanded]   = useState(false);

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useAppSelector } from "@/store/hooks";
 import { Search01Icon, UserAdd01Icon, UserCheck01Icon, UserGroupIcon, Clock01Icon, Tick02Icon, Cancel01Icon, Message01Icon, ArrowRight01Icon, Home01Icon, Location01Icon } from "hugeicons-react";
 import UpgradeGate from "@/components/ui/UpgradeGate";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 import "./connections.css";
 
-interface Person { id: string; profileSlug?: string | null; name: string; image: string | null; headline: string | null; professionalTitle?: string | null; location?: string | null; }
+interface Person { id: string; profileSlug?: string | null; name: string; image: string | null; headline: string | null; professionalTitle?: string | null; location?: string | null; isBrandAmbassador?: boolean; }
 interface Connection { id: string; requester: Person; receiver: Person; }
 interface Data { connections: Connection[]; received: Connection[]; sent: Connection[]; }
 type Tab = "home" | "requests" | "suggestions" | "connected" | "sent";
@@ -45,27 +46,38 @@ function PersonCard({ person, children }: { person: Person; children: ReactNode 
   const avatarBg = getAvatarGradient(person.id || person.name);
 
   return <article className="cn-card">
-    <Link
-      href={href}
-      className="cn-photo"
-      style={!hasImage ? { background: avatarBg, color: "#ffffff" } : undefined}
-      aria-label={`View ${person.name}'s profile`}
-    >
-      {hasImage ? (
-        <img
-          src={person.image!}
-          alt=""
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span style={{ color: "#ffffff", fontWeight: 800, textShadow: "0 2px 10px rgba(0,0,0,0.25)" }}>
-          {initial}
-        </span>
+    <div className="relative">
+      <Link
+        href={href}
+        className="cn-photo"
+        style={!hasImage ? { background: avatarBg, color: "#ffffff" } : undefined}
+        aria-label={`View ${person.name}'s profile`}
+      >
+        {hasImage ? (
+          <img
+            src={person.image!}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <span style={{ color: "#ffffff", fontWeight: 800, textShadow: "0 2px 10px rgba(0,0,0,0.25)" }}>
+            {initial}
+          </span>
+        )}
+      </Link>
+      {person.isBrandAmbassador && (
+        <div className="absolute top-2 right-2 bg-[#071326] rounded-full p-1 border border-amber-400/80 shadow-lg z-10">
+          <BrandAmbassadorBadge size={18} showTooltip={false} />
+        </div>
       )}
-    </Link>
-    <div className="cn-card-body"><Link href={href} className="cn-name">{person.name}</Link>
+    </div>
+    <div className="cn-card-body">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Link href={href} className="cn-name">{person.name}</Link>
+        {person.isBrandAmbassador && <BrandAmbassadorBadge size={16} />}
+      </div>
       <p className="cn-role">{person.professionalTitle || person.headline || "Community member"}</p>
       <p className="cn-detail">{person.location ? <><Location01Icon size={14} />{person.location}</> : <><UserGroupIcon size={14} />TaxCompPro community</>}</p>
       <div className="cn-actions">{children}</div>

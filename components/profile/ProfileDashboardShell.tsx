@@ -87,6 +87,7 @@ export default function ProfileDashboardShell({
               mediaPhotos: u.mediaPhotos ?? [],
               voiceMemoUrl: u.voiceMemoUrl ?? null,
               hasDueDiligenceBadge: u.hasDueDiligenceBadge ?? false,
+              isBrandAmbassador: u.isBrandAmbassador ?? false,
             })
           );
         }
@@ -259,9 +260,7 @@ export default function ProfileDashboardShell({
                     <p className="text-xs font-bold text-[#0A1628] dark:text-white truncate">{currentUser?.name}</p>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{currentUser?.email}</p>
                     <span className="inline-block mt-1 text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
-                      {currentUser && "role" in currentUser && currentUser.role === "PROFESSIONAL"
-                        ? "Verified Pro"
-                        : currentUser && "role" in currentUser && currentUser.role === "ADMIN"
+                      {currentUser && "role" in currentUser && currentUser.role === "ADMIN"
                         ? "Admin"
                         : "Member"}
                     </span>

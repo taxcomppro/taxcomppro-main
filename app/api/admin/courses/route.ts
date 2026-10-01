@@ -11,8 +11,7 @@ async function getCourseCreator(req: NextRequest) {
   const canManage =
     dbUser.role === "ADMIN" ||
     dbUser.tier === "MARKETPLACE" ||
-    dbUser.tier === "MARKETPLACE_PLUS" ||
-    dbUser.role === "PROFESSIONAL";
+    dbUser.tier === "MARKETPLACE_PLUS";
   if (!canManage) return null;
   return dbUser;
 }

@@ -121,9 +121,8 @@
 .gd-settings label { display: block; font-size: 14px; font-weight: 650; margin: 22px 0 9px; }
 .gp-page .gd-settings input:not([type="file"]), .gp-page .gd-settings textarea { width: 100%; padding: 13px 15px; color: var(--gp-text) !important; background: var(--gp-inner) !important; border: 1px solid var(--gp-line) !important; border-radius: 10px; font-size: 15px; }
 .gd-settings textarea { resize: vertical; }
-.gd-settings input[type="file"] { margin-top: 14px; max-width: 100%; font-size: 13px; }
-.gd-settings-cover { position: relative; height: 200px; border-radius: 12px; overflow: hidden; }
-.gd-settings-cover img { object-fit: cover; }
+.gd-settings-cover { position: relative; aspect-ratio: 2.8 / 1; height: auto; min-height: 160px; border-radius: 12px; overflow: hidden; }
+.gd-settings-cover img { object-fit: cover; object-position: center; }
 .gd-cover-controls, .gd-settings footer { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
 .gd-settings footer { justify-content: space-between; padding-top: 20px; border-top: 1px solid var(--gp-line); }
 .gd-secondary { display: inline-flex !important; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--gp-line); border-radius: 9px; color: var(--gp-text); background: var(--gp-inner); font-size: 13px !important; margin: 0 !important; cursor: pointer; }

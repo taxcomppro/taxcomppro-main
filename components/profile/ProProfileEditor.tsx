@@ -1271,7 +1271,6 @@ export default function ProProfileEditor() {
         onClose={() => setEditModalOpen(false)}
         initialData={profile}
         userId={user?.id || ""}
-        role={user?.role || "PROFESSIONAL"}
         initialServices={services}
         onSaveSuccess={onProfileUpdated}
       />

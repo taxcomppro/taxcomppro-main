@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }),
       prisma.user.update({
         where: { id: app.userId },
-        data: { role: "PROFESSIONAL" },
+        data: { tier: "MARKETPLACE" },
       }),
       prisma.notification.create({
         data: {

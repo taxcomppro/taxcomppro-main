@@ -44,8 +44,9 @@ import {
   Zap,
 } from "lucide-react";
 import { AdminMemberProfileDrawer } from "@/components/profile/AdminMemberProfileDrawer";
+import { BrandAmbassadorBadge } from "@/components/badges/BrandAmbassadorBadge";
 
-type Role = "MEMBER" | "PROFESSIONAL" | "ADMIN";
+type Role = "MEMBER" | "ADMIN";
 type Tier = "FREE" | "VIP" | "MARKETPLACE" | "MARKETPLACE_PLUS";
 
 interface DigitalCardInfo {
@@ -95,6 +96,7 @@ interface User {
   phone?: string | null;
   role: Role;
   tier: Tier;
+  isBrandAmbassador?: boolean;
   image: string | null;
   createdAt: string;
   digitalCard?: DigitalCardInfo | null;
@@ -112,7 +114,7 @@ interface SortConfig {
   direction: SortDirection;
 }
 
-type PresetTab = "ALL" | "CONNECT_CARD" | "MEMBER" | "PROFESSIONAL" | "ADMIN" | "PAID_TIERS" | "BUNDLES_ACTIVE";
+type PresetTab = "ALL" | "BRAND_AMBASSADORS" | "CONNECT_CARD" | "MEMBER" | "ADMIN" | "PAID_TIERS" | "BUNDLES_ACTIVE";
 type CardFilter = "ALL" | "ACTIVE" | "PENDING" | "NONE";
 type AccessFilter = "ALL" | "HAS_ANY" | "ULTIMATE_BUNDLE_PLUS" | "ULTIMATE_BUNDLE" | "HAS_TOOLKIT" | "HAS_COURSE" | "NO_PRODUCTS";
 type SubStatusFilter = "ALL" | "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "FREE";
@@ -145,9 +147,8 @@ export function getUserProductSummary(u: User) {
 }
 
 const roleConfig: Record<Role, { label: string; className: string; icon: React.ElementType }> = {
-  MEMBER:       { label: "Member",       className: "bg-slate-800/60 text-slate-400 border border-slate-700/30",    icon: Shield },
-  PROFESSIONAL: { label: "Professional", className: "bg-blue-500/10 text-blue-400 border border-blue-500/20",      icon: Briefcase },
-  ADMIN:        { label: "Admin",        className: "bg-amber-500/15 text-amber-400 border border-amber-500/20",    icon: Crown },
+  MEMBER: { label: "Member", className: "bg-slate-800/60 text-slate-400 border border-slate-700/30", icon: Shield },
+  ADMIN:  { label: "Admin",  className: "bg-amber-500/15 text-amber-400 border border-amber-500/20", icon: Crown },
 };
 
 const tierConfig: Record<Tier, { label: string; className: string }> = {
@@ -171,11 +172,13 @@ function UserEditDropdown({
   userId,
   currentRole,
   currentTier,
+  isBrandAmbassador = false,
   anchor,
   anchorEl,
   onClose,
   onSelectRole,
   onSelectTier,
+  onToggleBrandAmbassador,
   onRequestViewProfile,
   onRequestManageAccess,
   onRequestAddMembership,
@@ -185,11 +188,13 @@ function UserEditDropdown({
   userId: string;
   currentRole: Role;
   currentTier: Tier;
+  isBrandAmbassador?: boolean;
   anchor: DOMRect;
   anchorEl?: HTMLElement | null;
   onClose: () => void;
   onSelectRole: (role: Role) => void;
   onSelectTier: (tier: Tier) => void;
+  onToggleBrandAmbassador: (val: boolean) => void;
   onRequestViewProfile: () => void;
   onRequestManageAccess: () => void;
   onRequestAddMembership: () => void;
@@ -299,7 +304,7 @@ function UserEditDropdown({
       <div>
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 px-2">Assign Role</p>
         <div className="flex flex-col gap-0.5">
-          {(["MEMBER", "PROFESSIONAL", "ADMIN"] as Role[]).map((r) => {
+          {(["MEMBER", "ADMIN"] as Role[]).map((r) => {
             const rc = roleConfig[r];
             const Icon = rc.icon;
             return (
@@ -315,6 +320,39 @@ function UserEditDropdown({
             );
           })}
         </div>
+      </div>
+
+      <div className="h-px bg-slate-800" />
+
+      {/* Brand Ambassador Section */}
+      <div>
+        <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1.5 px-2 flex items-center justify-between">
+          <span>Brand Ambassador</span>
+        </p>
+        <button
+          onClick={() => onToggleBrandAmbassador(!isBrandAmbassador)}
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold transition-all border text-left cursor-pointer ${
+            isBrandAmbassador
+              ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25 shadow-sm shadow-amber-500/10"
+              : "hover:bg-slate-800 text-slate-400 border-slate-800 hover:text-slate-200"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <img
+              src="/brand-ambassador-badge.png"
+              alt="Brand Ambassador"
+              className="w-4 h-4 object-contain shrink-0"
+            />
+            <span>Brand Ambassador</span>
+          </div>
+          {isBrandAmbassador ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+              Active
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-500 font-normal">Off</span>
+          )}
+        </button>
       </div>
 
       {/* Separator */}
@@ -638,9 +676,9 @@ export default function AdminUsersPage() {
       // 1. Preset tabs
       if (presetTab === "CONNECT_CARD") {
         if (!u.digitalCard?.isPurchased && !u.digitalCard?.isActivated) return false;
-      } else if (presetTab === "MEMBER" && u.role !== "MEMBER") {
+      } else if (presetTab === "BRAND_AMBASSADORS" && !u.isBrandAmbassador) {
         return false;
-      } else if (presetTab === "PROFESSIONAL" && u.role !== "PROFESSIONAL") {
+      } else if (presetTab === "MEMBER" && u.role !== "MEMBER") {
         return false;
       } else if (presetTab === "ADMIN" && u.role !== "ADMIN") {
         return false;
@@ -766,7 +804,7 @@ export default function AdminUsersPage() {
           return mult * (getScore(a) - getScore(b));
         }
         case "role": {
-          const rank: Record<Role, number> = { ADMIN: 3, PROFESSIONAL: 2, MEMBER: 1 };
+          const rank: Record<Role, number> = { ADMIN: 2, MEMBER: 1 };
           return mult * ((rank[a.role] || 0) - (rank[b.role] || 0));
         }
         case "tier": {
@@ -801,8 +839,8 @@ export default function AdminUsersPage() {
     [users]
   );
   const memberCount = useMemo(() => users.filter((u) => u.role === "MEMBER").length, [users]);
-  const proCount = useMemo(() => users.filter((u) => u.role === "PROFESSIONAL").length, [users]);
   const adminCount = useMemo(() => users.filter((u) => u.role === "ADMIN").length, [users]);
+  const ambassadorCount = useMemo(() => users.filter((u) => u.isBrandAmbassador).length, [users]);
   const paidCount = useMemo(() => users.filter((u) => u.tier !== "FREE").length, [users]);
   const bundleActiveCount = useMemo(
     () =>
@@ -990,7 +1028,7 @@ export default function AdminUsersPage() {
   );
 
   // Update role or tier
-  const updateUser = async (userId: string, updates: { role?: Role; tier?: Tier }) => {
+  const updateUser = async (userId: string, updates: { role?: Role; tier?: Tier; isBrandAmbassador?: boolean }) => {
     setLoadingId(userId);
     setActionError(null);
     try {
@@ -1250,23 +1288,24 @@ export default function AdminUsersPage() {
           <div className="flex gap-1.5 flex-wrap items-center">
             {[
               { id: "ALL", label: "All Users", count: users.length },
+              { id: "BRAND_AMBASSADORS", label: "🛡️ Ambassadors", count: ambassadorCount },
               { id: "BUNDLES_ACTIVE", label: "👑 Bundles & Toolkits", count: bundleActiveCount },
               { id: "CONNECT_CARD", label: "💳 Connect Cards", count: connectCardCount },
               { id: "MEMBER", label: "Members", count: memberCount },
-              { id: "PROFESSIONAL", label: "Professionals", count: proCount },
               { id: "ADMIN", label: "Admins", count: adminCount },
               { id: "PAID_TIERS", label: "⭐ Paid Tiers", count: paidCount },
             ].map((tab) => {
               const active = presetTab === tab.id;
               const isCard = tab.id === "CONNECT_CARD";
               const isBundle = tab.id === "BUNDLES_ACTIVE";
+              const isAmbassador = tab.id === "BRAND_AMBASSADORS";
               return (
                 <button
                   key={tab.id}
                   onClick={() => {
                     setPresetTab(tab.id as PresetTab);
                     // Sync role filter if a role tab is selected
-                    if (["MEMBER", "PROFESSIONAL", "ADMIN"].includes(tab.id)) {
+                    if (["MEMBER", "ADMIN"].includes(tab.id)) {
                       setRoleFilter(tab.id as Role);
                     } else if (tab.id === "ALL") {
                       setRoleFilter("ALL");
@@ -1274,7 +1313,9 @@ export default function AdminUsersPage() {
                   }}
                   className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
                     active
-                      ? isBundle
+                      ? isAmbassador
+                        ? "bg-gradient-to-r from-amber-500 to-amber-300 text-slate-950 shadow-lg shadow-amber-500/30 font-black"
+                        : isBundle
                         ? "bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 font-black"
                         : isCard
                         ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-black"
@@ -1325,7 +1366,6 @@ export default function AdminUsersPage() {
           >
             <option value="ALL">All Roles</option>
             <option value="MEMBER">Member</option>
-            <option value="PROFESSIONAL">Professional</option>
             <option value="ADMIN">Admin</option>
           </select>
 
@@ -1872,8 +1912,9 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-100 text-sm group-hover:text-amber-400 transition-colors flex items-center gap-1.5">
+                            <div className="font-semibold text-slate-100 text-sm group-hover:text-amber-400 transition-colors flex items-center gap-1.5 flex-wrap">
                               <span>{u.name || "Unnamed User"}</span>
+                              {u.isBrandAmbassador && <BrandAmbassadorBadge size="sm" />}
                               <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-70 transition-opacity text-amber-400" />
                             </div>
                             <div className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
@@ -2284,7 +2325,6 @@ export default function AdminUsersPage() {
                 {[
                   { id: "ALL", label: "All Roles" },
                   { id: "MEMBER", label: "Member" },
-                  { id: "PROFESSIONAL", label: "Professional" },
                   { id: "ADMIN", label: "Admin" },
                 ].map((item) => (
                   <button
@@ -2460,11 +2500,15 @@ export default function AdminUsersPage() {
           userId={openDropdown.id}
           currentRole={users.find((u) => u.id === openDropdown.id)?.role ?? "MEMBER"}
           currentTier={users.find((u) => u.id === openDropdown.id)?.tier ?? "FREE"}
+          isBrandAmbassador={users.find((u) => u.id === openDropdown.id)?.isBrandAmbassador ?? false}
           anchor={openDropdown.rect}
           anchorEl={openDropdown.btnEl}
           onClose={() => setOpenDropdown(null)}
           onSelectRole={(role) => updateUser(openDropdown.id, { role })}
           onSelectTier={(tier) => updateUser(openDropdown.id, { tier })}
+          onToggleBrandAmbassador={(isBrandAmbassador) =>
+            updateUser(openDropdown.id, { isBrandAmbassador })
+          }
           onRequestViewProfile={() => {
             const targetId = openDropdown.id;
             handleOpenOverviewDrawer(targetId);

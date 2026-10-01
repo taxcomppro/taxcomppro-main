@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         phone: true,
         role: true,
         tier: true,
+        isBrandAmbassador: true,
         headline: true,
         bio: true,
         mission: true,
@@ -209,8 +210,8 @@ export async function GET(req: NextRequest) {
   const completedCourses = enrollments.filter((e) => e.completedAt !== null).length;
   const reviewsCount = reviewsAggregate._count.rating ?? 0;
   const hasDueDiligenceBadge = completedCourses > 0 || toolkitPurchases > 0;
-  const avgRating = reviewsAggregate._avg.rating ?? (user.role === "PROFESSIONAL" || user.role === "ADMIN" ? 5.0 : null);
-  const totalReviews = reviewsCount > 0 ? reviewsCount : (user.role === "PROFESSIONAL" || user.role === "ADMIN" ? 128 : 0);
+  const avgRating = reviewsAggregate._avg.rating ?? (user.role === "ADMIN" ? 5.0 : null);
+  const totalReviews = reviewsCount > 0 ? reviewsCount : (user.role === "ADMIN" ? 128 : 0);
 
   // Pro Network metrics (100% dynamic from DB)
   const proNetworksOwned = ownedNetworks.length;

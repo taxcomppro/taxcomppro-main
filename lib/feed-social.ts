@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 export const originalPostSelect = {
   id: true, content: true, images: true, videoUrl: true, createdAt: true,
   scheduledAt: true, isRepost: true, communityId: true,
-  author: { select: { id: true, profileSlug: true, name: true, image: true, aiSpecialist: { select: { id: true } } } },
+  author: { select: { id: true, profileSlug: true, name: true, image: true, isBrandAmbassador: true, aiSpecialist: { select: { id: true } } } },
   community: { select: { name: true, slug: true, isPublic: true } },
   _count: { select: { reposts: true } },
 } as const satisfies Prisma.PostSelect;

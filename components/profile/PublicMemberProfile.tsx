@@ -38,6 +38,7 @@ import ProfileMediaStrip, { type FeedMedia } from "@/components/profile/ProfileM
 import "./profile-ui.css";
 import { VoiceMemoPlayer } from "@/components/profile/VoiceMemo";
 import DueDiligenceBadge from "@/components/badges/DueDiligenceBadge";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 import FeedVideoPlayer from "@/components/feed/FeedVideoPlayer";
 
 interface CourseItem {
@@ -132,6 +133,7 @@ interface PublicUser {
   createdAt: string;
   connectionCount: number;
   hasDueDiligenceBadge: boolean;
+  isBrandAmbassador?: boolean;
   viewerConnectionStatus?: "NONE" | "PENDING" | "ACCEPTED";
   networks?: PublicNetwork[];
   networkStats?: { proNetworks: number; discussionsStarted: number; proTalksHosted: number };
@@ -386,7 +388,7 @@ export default function PublicMemberProfile({memberId: id, specialist}: {memberI
   }
 
   const tierInfo = TIER_CONFIG[profile.tier] ?? TIER_CONFIG["FREE"];
-  const isPro = profile.role === "PROFESSIONAL";
+  const isPro = profile.tier === "MARKETPLACE" || profile.tier === "MARKETPLACE_PLUS";
   const memberSince = profile.createdAt
     ? new Date(profile.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })
     : "Recently";
@@ -482,7 +484,14 @@ export default function PublicMemberProfile({memberId: id, specialist}: {memberI
                 </div>
 
                 {/* Role / Verified Badge overlay on Avatar */}
-                {profile.hasDueDiligenceBadge ? (
+                {profile.isBrandAmbassador ? (
+                  <div
+                    className="absolute -bottom-2 -right-2 bg-[#071326] rounded-full p-1 shadow-xl border-2 border-amber-400"
+                    title="Official TCP Brand Ambassador"
+                  >
+                    <BrandAmbassadorBadge size={26} showTooltip={false} />
+                  </div>
+                ) : profile.hasDueDiligenceBadge ? (
                   <div
                     className="absolute -bottom-2 -right-2 bg-white dark:bg-[#172135] rounded-full p-1 shadow-md border-2 border-amber-400"
                     title="Due Diligence Award Verified"
@@ -502,9 +511,22 @@ export default function PublicMemberProfile({memberId: id, specialist}: {memberI
               <div className="space-y-1.5 min-w-0 flex-1">
                 {/* Name & Badges Row */}
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <h1 className="text-2xl sm:text-3xl font-black text-[#0a1628] dark:text-white tracking-tight">
-                    {profile.name}
-                  </h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl sm:text-3xl font-black text-[#0a1628] dark:text-white tracking-tight">
+                      {profile.name}
+                    </h1>
+                    {profile.isBrandAmbassador && (
+                      <BrandAmbassadorBadge size={26} tooltipPosition="top" />
+                    )}
+                  </div>
+
+                  {/* Brand Ambassador Pill */}
+                  {profile.isBrandAmbassador && (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-black bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/40 px-3 py-0.5 rounded-full shadow-[0_0_12px_rgba(245,158,11,0.2)]">
+                      <BrandAmbassadorBadge size={16} showTooltip={false} />
+                      <span>Brand Ambassador</span>
+                    </span>
+                  )}
 
                   {/* Pro Badge */}
                   {isPro && (
@@ -981,6 +1003,27 @@ export default function PublicMemberProfile({memberId: id, specialist}: {memberI
 
             {/* Right Sidebar (4 cols) */}
             <div className="lg:col-span-4 space-y-6">
+              {/* Brand Ambassador Showcase Card */}
+              {profile.isBrandAmbassador && (
+                <div className="rounded-2xl bg-gradient-to-br from-amber-500/15 via-yellow-500/10 to-[#071326]/50 border border-amber-400/80 dark:border-amber-500/60 p-5 shadow-lg space-y-3 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 bg-amber-400/15 rounded-full blur-xl pointer-events-none" />
+                  <div className="flex items-center gap-3">
+                    <BrandAmbassadorBadge size={36} showTooltip={false} />
+                    <div>
+                      <h4 className="text-sm font-black text-[#0a1628] dark:text-white">
+                        TCP Brand Ambassador
+                      </h4>
+                      <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                        Official Platform Leadership
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    This member is an official Brand Ambassador for Tax Compliance Pro, recognized for platform advocacy, professional excellence, and community mentorship.
+                  </p>
+                </div>
+              )}
+
               {/* Due Diligence Verified Card */}
               {profile.hasDueDiligenceBadge ? (
                 <div className="rounded-2xl bg-gradient-to-br from-amber-500/10 via-yellow-500/5 to-transparent border border-amber-300/80 dark:border-amber-700/60 p-5 shadow-xs space-y-3">

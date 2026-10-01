@@ -5,8 +5,9 @@ import Link from "next/link";
 import { NetworkPostSkeleton } from "./NetworkSkeleton";
 import { BubbleChatIcon, LockIcon, PinIcon, SentIcon, Loading03Icon, UserCircleIcon, Image01Icon, Video01Icon, Cancel01Icon, Link01Icon } from "hugeicons-react";
 import LinkifiedText from "@/components/ui/LinkifiedText";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 
-type Person = { id?: string; name?: string; image?: string | null; profileSlug?: string | null };
+type Person = { id?: string; name?: string; image?: string | null; profileSlug?: string | null; isBrandAmbassador?: boolean };
 
 export type NetworkPost = { images?: string[]; videoUrl?: string | null; id: string; title: string; content: string; category: string; createdAt: string; isPinned?: boolean; isMembersOnly?: boolean; isLocked?: boolean; author: Person | string; _count?: { replies: number }; replyCount?: number };
 
@@ -14,8 +15,18 @@ type Reply = { id: string; content: string; author: Person | string };
 
 function Avatar({ person }: { person?: Person | string | null }) {
   if (!person) return <span className="np-avatar np-avatar-fallback"><UserCircleIcon size={24} /></span>;
+  const isAmbassador = typeof person === "object" && Boolean(person?.isBrandAmbassador);
   const image = typeof person === "object" ? person.image : null;
-  return image ? <img className="np-avatar" src={image} alt="" /> : <span className="np-avatar np-avatar-fallback"><UserCircleIcon size={24} /></span>;
+  return (
+    <span className="relative inline-block">
+      {image ? <img className="np-avatar" src={image} alt="" /> : <span className="np-avatar np-avatar-fallback"><UserCircleIcon size={24} /></span>}
+      {isAmbassador && (
+        <span className="absolute -bottom-1 -right-1 bg-[#071326] rounded-full p-0.5 border border-amber-400 shadow-xs z-10">
+          <BrandAmbassadorBadge size={14} showTooltip={false} />
+        </span>
+      )}
+    </span>
+  );
 }
 
 function profile(person?: Person | string | null) {
@@ -68,7 +79,7 @@ function Post({ post, slug }: { post: NetworkPost; slug: string }) {
 
   return <article className="np-card">
     {post.isPinned && <div className="np-pinned"><PinIcon size={14} /> Featured post</div>}
-    <header className="np-post-header"><Link href={profile(post.author)}><Avatar person={post.author} /></Link><div><Link className="np-author" href={profile(post.author)}>{authorName(post.author)}</Link><div className="np-meta"><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time><span>·</span><LockIcon size={12} /><span>{post.isMembersOnly ? "Members only" : "Network post"}</span></div></div><span className="np-category">{post.category}</span></header>
+    <header className="np-post-header"><Link href={profile(post.author)}><Avatar person={post.author} /></Link><div><Link className="np-author inline-flex items-center gap-1.5" href={profile(post.author)}><span>{authorName(post.author)}</span>{typeof post.author === "object" && Boolean(post.author?.isBrandAmbassador) && <BrandAmbassadorBadge size={16} />}</Link><div className="np-meta"><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time><span>·</span><LockIcon size={12} /><span>{post.isMembersOnly ? "Members only" : "Network post"}</span></div></div><span className="np-category">{post.category}</span></header>
     <div className="np-post-content">
       {post.title !== automaticTitle && <h3>{post.title}</h3>}
       <p className="whitespace-pre-wrap"><LinkifiedText text={expanded || post.content.length < 650 ? post.content : `${post.content.slice(0, 650)}…`} /></p>
@@ -80,7 +91,7 @@ function Post({ post, slug }: { post: NetworkPost; slug: string }) {
     {open && <section className="np-comments" aria-label="Comments">
       {loading && <p role="status">Loading comments…</p>}
       {error && <p role="alert" className="np-error">{error} {!replies && <button onClick={loadComments}>Try again</button>}</p>}
-      {replies?.map(reply => <div className="np-comment" key={reply.id}><Link href={profile(reply.author)}><Avatar person={reply.author} /></Link><div><Link className="np-author" href={profile(reply.author)}>{authorName(reply.author)}</Link><p className="whitespace-pre-wrap"><LinkifiedText text={reply.content} /></p></div></div>)}
+      {replies?.map(reply => <div className="np-comment" key={reply.id}><Link href={profile(reply.author)}><Avatar person={reply.author} /></Link><div><Link className="np-author inline-flex items-center gap-1.5" href={profile(reply.author)}><span>{authorName(reply.author)}</span>{typeof reply.author === "object" && Boolean(reply.author?.isBrandAmbassador) && <BrandAmbassadorBadge size={14} />}</Link><p className="whitespace-pre-wrap"><LinkifiedText text={reply.content} /></p></div></div>)}
       {replies?.length === 0 && <p className="np-meta">Be the first to comment.</p>}
       {replies !== null && <form onSubmit={comment} className="np-comment-form"><textarea aria-label="Write a comment" placeholder="Write a comment…" value={content} maxLength={5000} onChange={e => setContent(e.target.value)} rows={2} /><button className="pn-button pn-primary" disabled={busy || !content.trim()} aria-label="Post comment">{busy ? <Loading03Icon size={18} /> : <SentIcon size={18} />}</button></form>}
     </section>}

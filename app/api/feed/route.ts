@@ -39,9 +39,9 @@ export async function GET(req: NextRequest) {
     ...(!postId && cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     include: {
       originalPost: { select: originalPostSelect },
-      author: { select: { id: true, aiSpecialist: { select: { id: true } }, profileSlug: true, name: true, image: true, headline: true, role: true, tier: true } },
+      author: { select: { id: true, aiSpecialist: { select: { id: true } }, profileSlug: true, name: true, image: true, headline: true, role: true, tier: true, isBrandAmbassador: true } },
       comments: {
-        include: { author: { select: { id: true, aiSpecialist: { select: { id: true } }, profileSlug: true, name: true, image: true } } },
+        include: { author: { select: { id: true, aiSpecialist: { select: { id: true } }, profileSlug: true, name: true, image: true, isBrandAmbassador: true } } },
         orderBy: { createdAt: "asc" as const },
         take: 3,
       },

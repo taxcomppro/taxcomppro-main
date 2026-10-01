@@ -15,21 +15,21 @@ export async function GET(req: NextRequest) {
     prisma.connection.findMany({
       where: { OR: [{ requesterId: userId }, { receiverId: userId }], status: "ACCEPTED" },
       include: {
-        requester: { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true } },
-        receiver:  { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true } },
+        requester: { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true, isBrandAmbassador: true } },
+        receiver:  { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true, isBrandAmbassador: true } },
       },
       orderBy: { updatedAt: "desc" },
     }),
     // Pending requests I received
     prisma.connection.findMany({
       where: { receiverId: userId, status: "PENDING" },
-      include: { requester: { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true } } },
+      include: { requester: { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true, isBrandAmbassador: true } } },
       orderBy: { createdAt: "desc" },
     }),
     // Requests I sent
     prisma.connection.findMany({
       where: { requesterId: userId, status: "PENDING" },
-      include: { receiver: { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true } } },
+      include: { receiver: { select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true, isBrandAmbassador: true } } },
       orderBy: { createdAt: "desc" },
     }),
   ]);

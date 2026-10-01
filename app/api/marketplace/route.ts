@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   const isAdmin = user?.role === "ADMIN";
-  const canSell = isAdmin || user?.tier === "MARKETPLACE" || user?.tier === "MARKETPLACE_PLUS" || user?.role === "PROFESSIONAL";
+  const canSell = isAdmin || user?.tier === "MARKETPLACE" || user?.tier === "MARKETPLACE_PLUS";
 
   if (!canSell) {
     return NextResponse.json({ error: "Upgrade to Marketplace tier to create listings" }, { status: 403 });

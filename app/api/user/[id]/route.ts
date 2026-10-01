@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         twitter: true, facebook: true, specialties: true,
         certifications: true, languages: true, mediaPhotos: true,
         voiceMemoUrl: true,
-        role: true, tier: true, createdAt: true,
+        role: true, tier: true, isBrandAmbassador: true, createdAt: true,
         instructorCourses: {
           where: { status: "PUBLISHED" },
           select: { id: true, slug: true, title: true, thumbnail: true, level: true, price: true, isFree: true },

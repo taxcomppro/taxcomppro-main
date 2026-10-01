@@ -45,6 +45,7 @@ import {
   Zap,
 } from "lucide-react";
 import { getToolkit, getBundle } from "@/lib/toolkits";
+import { BrandAmbassadorBadge } from "@/components/badges/BrandAmbassadorBadge";
 
 interface AdminMemberProfileDrawerProps {
   userId: string | null;
@@ -58,9 +59,8 @@ interface AdminMemberProfileDrawerProps {
 }
 
 const roleBadges: Record<string, { label: string; className: string; icon: React.ElementType }> = {
-  MEMBER:       { label: "Member",       className: "bg-slate-800 text-slate-300 border-slate-700", icon: Shield },
-  PROFESSIONAL: { label: "Professional", className: "bg-blue-500/15 text-blue-400 border-blue-500/30", icon: Briefcase },
-  ADMIN:        { label: "Admin",        className: "bg-amber-500/15 text-amber-400 border-amber-500/30", icon: Crown },
+  MEMBER: { label: "Member", className: "bg-slate-800 text-slate-300 border-slate-700", icon: Shield },
+  ADMIN:  { label: "Admin",  className: "bg-amber-500/15 text-amber-400 border-amber-500/30", icon: Crown },
 };
 
 const tierBadges: Record<string, { label: string; className: string }> = {
@@ -86,6 +86,7 @@ export function AdminMemberProfileDrawer({
     "overview" | "access" | "membership" | "affiliate" | "payments" | "courses" | "card"
   >(initialTab);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [togglingAmbassador, setTogglingAmbassador] = useState(false);
 
   // Access & Entitlements State
   const [accessData, setAccessData] = useState<any>(null);
@@ -243,6 +244,27 @@ export function AdminMemberProfileDrawer({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const handleToggleBrandAmbassador = async () => {
+    if (!user) return;
+    setTogglingAmbassador(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isBrandAmbassador: !user.isBrandAmbassador }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setUser((prev: any) => ({ ...prev, isBrandAmbassador: updated.isBrandAmbassador }));
+        onAccessUpdated?.();
+      }
+    } catch (err: any) {
+      console.error("Failed to toggle brand ambassador", err);
+    } finally {
+      setTogglingAmbassador(false);
+    }
+  };
+
   if (!userId) return null;
 
   const role = user?.role || "MEMBER";
@@ -287,6 +309,26 @@ export function AdminMemberProfileDrawer({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleToggleBrandAmbassador}
+              disabled={togglingAmbassador}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                user?.isBrandAmbassador
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30 shadow-sm shadow-amber-500/10"
+                  : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+              }`}
+              title="Toggle Brand Ambassador status for this member"
+            >
+              <img
+                src="/brand-ambassador-badge.png"
+                alt=""
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
+              <span className="hidden sm:inline">
+                {user?.isBrandAmbassador ? "Ambassador Active" : "Make Ambassador"}
+              </span>
+            </button>
+
             {onGiftMembership && (
               <button
                 onClick={() => onGiftMembership(user)}
@@ -368,6 +410,7 @@ export function AdminMemberProfileDrawer({
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h3 className="text-xl font-black text-white truncate">{user.name}</h3>
+                    {user.isBrandAmbassador && <BrandAmbassadorBadge size="md" />}
                     {/* Role Badge */}
                     <span
                       className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${rc.className}`}

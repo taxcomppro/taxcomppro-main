@@ -8,6 +8,7 @@ import { useAppSelector } from "@/store/hooks";
 import { Loading03Icon as Loader2, MoreHorizontalIcon as MoreHorizontal, Edit01Icon as Pencil, Delete02Icon as Trash2, Tick02Icon as Check, Cancel01Icon as X, ArrowLeft01Icon as ChevronLeft, ArrowRight01Icon as ChevronRight } from "hugeicons-react";
 import { SentIcon, UserGroupIcon, GlobeIcon, LockIcon, RepeatIcon } from "hugeicons-react";
 import DueDiligenceBadge from "@/components/badges/DueDiligenceBadge";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 import UpgradeModal from "@/components/ui/UpgradeModal";
 import FeedVideoPlayer from "./FeedVideoPlayer";
 import PostLikesModal from "./PostLikesModal";
@@ -18,11 +19,12 @@ interface Author {
   headline: string | null; role: string; tier: string;
   aiSpecialist?: { id: string } | null;
   hasDueDiligenceBadge?: boolean;
+  isBrandAmbassador?: boolean;
 }
 
 interface Comment {
   id: string; content: string; createdAt: string;
-  author: { aiSpecialist?: { id: string } | null; id: string; profileSlug?: string | null; name: string; image: string | null };
+  author: { aiSpecialist?: { id: string } | null; id: string; profileSlug?: string | null; name: string; image: string | null; isBrandAmbassador?: boolean };
 }
 
 export interface FeedPost {
@@ -63,7 +65,7 @@ const tierBadge: Record<string, string> = {
 
 export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post: FeedPost; onUpdate: (updated: FeedPost) => void; onDelete?: (id: string) => void; onRepost?: () => void }) {
   const user = useAppSelector(s => s.auth.user);
-  const isFree = (user?.tier === "FREE" || !user?.tier) && user?.role !== "ADMIN" && user?.role !== "PROFESSIONAL";
+  const isFree = (user?.tier === "FREE" || !user?.tier) && user?.role !== "ADMIN";
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [likeCount, setLikeCount]   = useState(post._count.likes);
   const [showLikesModal, setShowLikesModal] = useState(false);
@@ -187,6 +189,9 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Link href={`/member/${post.author.profileSlug || post.author.id}`} className="feed-author-link font-bold text-[#0a1628] text-base">{post.author.name}</Link>
+            {post.author.isBrandAmbassador && (
+              <BrandAmbassadorBadge size={22} />
+            )}
             {post.author.aiSpecialist && <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Tax Comp Pro AI Specialist</span>}
             {post.author.hasDueDiligenceBadge && (
               <DueDiligenceBadge size={22} />
@@ -268,7 +273,7 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
         {post.originalPost ? <>
           <Link className="feed-original-author" href={`/member/${post.originalPost.author.profileSlug || post.originalPost.author.id}`}>
             {post.originalPost.author.image ? <img src={post.originalPost.author.image} alt="" loading="lazy" /> : <span className="feed-original-initial">{post.originalPost.author.name[0]}</span>}
-            <span><strong>{post.originalPost.author.name}</strong>{post.originalPost.author.aiSpecialist && <small>Tax Comp Pro AI Specialist</small>}<small>{timeAgo(post.originalPost.createdAt)}{post.originalPost.community ? ` · ${post.originalPost.community.name}` : " · Public post"}</small></span>
+            <span><strong>{post.originalPost.author.name}</strong>{(post.originalPost.author as any).isBrandAmbassador && <BrandAmbassadorBadge size={16} />}{post.originalPost.author.aiSpecialist && <small>Tax Comp Pro AI Specialist</small>}<small>{timeAgo(post.originalPost.createdAt)}{post.originalPost.community ? ` · ${post.originalPost.community.name}` : " · Public post"}</small></span>
           </Link>
           <div className="whitespace-pre-wrap break-words text-slate-700">
             <LinkifiedText text={post.originalPost.content.length > 500 ? `${post.originalPost.content.slice(0,500)}…` : post.originalPost.content} />
@@ -361,8 +366,11 @@ export default function PostCard({ post, onUpdate, onDelete, onRepost }: { post:
                       ? <img loading="lazy" decoding="async" src={c.author.image} alt={c.author.name} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                       : <span className="text-white text-xs font-bold">{c.author.name?.[0]?.toUpperCase()}</span>}
                   </div>
-                  <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
-                    <Link href={`/member/${c.author.profileSlug || c.author.id}`} className="feed-author-link text-sm font-bold text-[#0a1628]">{c.author.name}</Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Link href={`/member/${c.author.profileSlug || c.author.id}`} className="feed-author-link text-sm font-bold text-[#0a1628]">{c.author.name}</Link>
+                      {c.author.isBrandAmbassador && <BrandAmbassadorBadge size="sm" />}
+                    </div>
                     {c.author.aiSpecialist && <span className="block text-xs text-amber-700 dark:text-amber-300">Tax Comp Pro AI Specialist</span>}
                     <div className="text-sm text-slate-600 mt-0.5 leading-relaxed whitespace-pre-wrap">
                       <LinkifiedText text={c.content} />

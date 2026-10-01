@@ -43,11 +43,11 @@ export async function PATCH(req: NextRequest) {
     include: { user: { select: { id: true, name: true, email: true } } },
   });
 
-  // If approved → upgrade user role to PROFESSIONAL
+  // If approved → upgrade user tier to MARKETPLACE
   if (status === "APPROVED") {
     await prisma.user.update({
       where: { id: app.userId },
-      data: { role: "PROFESSIONAL" },
+      data: { tier: "MARKETPLACE" },
     });
   }
 

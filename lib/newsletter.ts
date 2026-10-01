@@ -45,7 +45,7 @@ export async function resolveAudienceRecipients(
   if (audience === "VERIFIED") {
     whereClause.emailVerified = true;
   } else if (audience === "PROS") {
-    whereClause.role = "PROFESSIONAL";
+    whereClause.tier = { in: ["MARKETPLACE", "MARKETPLACE_PLUS"] };
   } else if (audience === "MEMBERS") {
     whereClause.role = "MEMBER";
   } else if (audience === "TIER_VIP") {

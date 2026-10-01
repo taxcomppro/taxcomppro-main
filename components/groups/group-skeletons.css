@@ -24,7 +24,7 @@
 @media(max-width:600px) { .gd-cover.gs-bone { height: 220px; } }
 /* Match the compact discovery cards, rather than the retired profile-style cards. */
 .gs-directory-card{min-width:0;overflow:hidden;border:1px solid var(--gp-line);border-radius:12px;background:var(--gp-panel)}
-.gs-directory-cover.gs-bone{width:100%;height:auto;aspect-ratio:1.8;border-radius:0;flex-shrink:0}
+.gs-directory-cover.gs-bone{width:100%;height:auto;aspect-ratio:2.8 / 1;border-radius:0;flex-shrink:0}
 .gs-directory-body{display:grid;gap:9px;padding:15px;min-width:0}
 .gs-directory-description{display:grid;gap:8px;margin:4px 0}
 .gs-directory-card .gs-bone{animation-duration:1.3s;max-width:100%}

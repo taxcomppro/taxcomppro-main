@@ -135,7 +135,7 @@ function ProfileContent() {
           <UpgradeBanner tier={upgradedTier} onDismiss={() => setShowBanner(false)} />
         </div>
       )}
-      {activeUser?.role === "PROFESSIONAL" || activeUser?.role === "ADMIN"
+      {activeUser?.tier === "MARKETPLACE" || activeUser?.tier === "MARKETPLACE_PLUS" || activeUser?.role === "ADMIN"
         ? <ProProfile />
         : <MemberProfile />}
     </div>

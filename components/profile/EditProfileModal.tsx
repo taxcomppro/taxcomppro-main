@@ -61,7 +61,7 @@ interface EditProfileModalProps {
   onClose: () => void;
   initialData: ProfileFormData;
   userId: string;
-  role: string;
+  role?: string;
   initialServices?: Service[];
   initialTab?: ProfileEditTab;
   onSaveSuccess: (updated: ProfileFormData) => void;
@@ -95,7 +95,7 @@ export default function EditProfileModal({
   onClose,
   initialData,
   userId,
-  role,
+  role: _role,
   initialServices = [],
   initialTab = "basic",
   onSaveSuccess,

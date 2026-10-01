@@ -59,6 +59,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ post
             headline: true,
             role: true,
             tier: true,
+            isBrandAmbassador: true,
           },
         },
       },

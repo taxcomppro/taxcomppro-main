@@ -8,7 +8,6 @@ datasource db {
 
 enum Role {
   MEMBER
-  PROFESSIONAL
   ADMIN
 }
 
@@ -136,6 +135,7 @@ model User {
   phone            String?
   role             Role             @default(MEMBER)
   tier             SubscriptionTier @default(FREE)
+  isBrandAmbassador Boolean          @default(false)
   image            String?
   coverImage       String?
   bio              String?

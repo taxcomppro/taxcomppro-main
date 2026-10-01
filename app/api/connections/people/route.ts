@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         { headline: { contains: search, mode: "insensitive" } },
       ]} : {}),
     },
-    select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true, tier: true },
+    select: { id: true, profileSlug: true, name: true, image: true, headline: true, professionalTitle: true, location: true, role: true, tier: true, isBrandAmbassador: true },
     take: limit,
     orderBy: { createdAt: "desc" },
   });

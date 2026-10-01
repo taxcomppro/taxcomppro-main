@@ -11,6 +11,7 @@ import {
 } from "hugeicons-react";
 import { ComputerVideoIcon as MonitorPlay, ArrowUpRight01Icon as ExternalLink } from "hugeicons-react";
 import DueDiligenceBadge from "@/components/badges/DueDiligenceBadge";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 
 const tierLabel: Record<string, string> = {
   FREE: "Free Member", VIP: "VIP Member",
@@ -46,7 +47,7 @@ export default function FeedLeftPanel() {
   if (!user) return null;
 
   const isAdmin = user.role === "ADMIN";
-  const canSell = isAdmin || user.tier === "MARKETPLACE" || user.tier === "MARKETPLACE_PLUS" || user.role === "PROFESSIONAL";
+  const canSell = isAdmin || user.tier === "MARKETPLACE" || user.tier === "MARKETPLACE_PLUS";
   // Admins display as their own tier label, not "Free Member"
   const tier = isAdmin ? "ADMIN" : (user.tier ?? "FREE");
 
@@ -122,6 +123,11 @@ export default function FeedLeftPanel() {
                 ? <img src={user.image} alt={user.name ?? ""} referrerPolicy="no-referrer" className="w-full h-full object-cover" />
                 : <span className="text-white font-black text-2xl">{user.name?.[0]?.toUpperCase()}</span>}
             </div>
+            {user.isBrandAmbassador && (
+              <div className="absolute -bottom-1 -right-1 bg-[#071326] rounded-full p-0.5 border border-amber-400 shadow-md">
+                <BrandAmbassadorBadge size={20} showTooltip={false} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -131,6 +137,7 @@ export default function FeedLeftPanel() {
             <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-extrabold text-[#0a1628] dark:text-white text-lg leading-tight truncate">{user.name}</span>
+              {user.isBrandAmbassador && <BrandAmbassadorBadge size={20} />}
               {user.hasDueDiligenceBadge && <DueDiligenceBadge size={22} />}
             </div>
               <div className="mt-1.5">

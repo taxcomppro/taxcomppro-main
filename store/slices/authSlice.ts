@@ -7,7 +7,7 @@ export interface AuthUser {
   professionalTitle?: string | null;
   name: string;
   phone?: string | null;
-  role: "MEMBER" | "PROFESSIONAL" | "ADMIN";
+  role: "MEMBER" | "ADMIN";
   tier: "FREE" | "VIP" | "MARKETPLACE" | "MARKETPLACE_PLUS";
   image?: string | null;
   coverImage?: string | null;
@@ -26,6 +26,7 @@ export interface AuthUser {
   mediaPhotos?: string[];
   voiceMemoUrl?: string | null;
   hasDueDiligenceBadge?: boolean;
+  isBrandAmbassador?: boolean;
 }
 
 interface AuthState {

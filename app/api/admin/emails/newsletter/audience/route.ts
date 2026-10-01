@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { emailVerified: true } }),
-        prisma.user.count({ where: { role: "PROFESSIONAL" } }),
+        prisma.user.count({ where: { tier: { in: ["MARKETPLACE", "MARKETPLACE_PLUS"] } } }),
         prisma.user.count({ where: { role: "MEMBER" } }),
         prisma.user.count({ where: { tier: "VIP" } }),
         prisma.user.count({ where: { tier: { in: ["MARKETPLACE", "MARKETPLACE_PLUS"] } } }),

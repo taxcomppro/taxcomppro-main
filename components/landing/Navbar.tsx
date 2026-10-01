@@ -75,17 +75,17 @@ const groups = [
         icon: UserAdd01Icon,
         description: "Grow your circle",
       },
+    ],
+  },
+  {
+    label: "More",
+    links: [
       {
         label: "Pro Marketing",
         href: "/pro-marketing",
         icon: Rocket01Icon,
         description: "Grow your presence",
       },
-    ],
-  },
-  {
-    label: "More",
-    links: [
       { label: "Tools", href: "/tools", icon: Rocket01Icon, description: "Coming soon" },
       {
         label: "Pricing & plans",

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const users = await prisma.user.findMany({
     where: {
       ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] } : {}),
-      ...(role !== "ALL" ? { role: role as "MEMBER" | "PROFESSIONAL" | "ADMIN" } : {}),
+      ...(role !== "ALL" ? { role: role as "MEMBER" | "ADMIN" } : {}),
       ...(tier !== "ALL" ? { tier: tier as "FREE" | "VIP" | "MARKETPLACE" | "MARKETPLACE_PLUS" } : {}),
     },
     select: {
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       phone: true,
       role: true,
       tier: true,
+      isBrandAmbassador: true,
       image: true,
       createdAt: true,
       subscription: {

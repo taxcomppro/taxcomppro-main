@@ -39,6 +39,7 @@ import NetworkEmblem from "@/components/networks/NetworkEmblem";
 import NetworksViewAllMenu from "@/components/profile/NetworksViewAllMenu";
 import { PROFESSIONAL_TITLES } from "@/lib/professionalTitles";
 import EditProfileModal, { type ProfileFormData } from "@/components/profile/EditProfileModal";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 
 interface Purchase {
   id: string;
@@ -357,7 +358,7 @@ export default function MemberProfile() {
   }
 
   // Listed on Find a Pro: professionals and anyone on a Marketplace plan
-  const isListed = user?.role === "PROFESSIONAL" || user?.tier === "MARKETPLACE" || user?.tier === "MARKETPLACE_PLUS";
+  const isListed = user?.tier === "MARKETPLACE" || user?.tier === "MARKETPLACE_PLUS";
 
   return (
     <div className="profile-editor max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -472,7 +473,18 @@ export default function MemberProfile() {
                 {/* Name & meta */}
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h1 className="text-xl sm:text-2xl font-black text-[#0A1628] dark:text-white tracking-tight truncate">{profile.name || "Your Name"}</h1>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl sm:text-2xl font-black text-[#0A1628] dark:text-white tracking-tight truncate">{profile.name || "Your Name"}</h1>
+                      {user?.isBrandAmbassador && (
+                        <BrandAmbassadorBadge size={24} tooltipPosition="top" />
+                      )}
+                    </div>
+                    {user?.isBrandAmbassador && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/40 text-[10px] font-black tracking-wider uppercase shadow-[0_0_12px_rgba(245,158,11,0.2)]">
+                        <BrandAmbassadorBadge size={14} showTooltip={false} />
+                        Brand Ambassador
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-500/20 text-[#1E56A0] dark:text-blue-300 border border-blue-200 dark:border-blue-500/30 text-[10px] font-black tracking-wider uppercase">
                       <ShieldCheck className="w-3 h-3" />
                       {stats.tierName}

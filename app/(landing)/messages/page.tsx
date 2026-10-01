@@ -7,9 +7,10 @@ import { useAppSelector } from "@/store/hooks";
 import { Room, RoomEvent } from "livekit-client";
 import { SentIcon, Message01Icon, ArrowLeft01Icon, Tick02Icon, Search01Icon, Attachment01Icon, Cancel01Icon, File01Icon, UserGroupIcon, ArrowRight01Icon, UserCircleIcon, RefreshIcon } from "hugeicons-react";
 import UpgradeGate from "@/components/ui/UpgradeGate";
+import BrandAmbassadorBadge from "@/components/badges/BrandAmbassadorBadge";
 import "./messages.css";
 
-type Person = { id: string; profileSlug?: string | null; name: string; image: string | null; headline?: string | null };
+type Person = { id: string; profileSlug?: string | null; name: string; image: string | null; headline?: string | null; isBrandAmbassador?: boolean };
 type Message = { id: string; senderId: string; receiverId: string; content: string; fileUrl?: string | null; fileName?: string | null; fileType?: string | null; isRead: boolean; isSponsored?: boolean; createdAt: string };
 type Thread = Message & { partner: Person; unreadCount: number };
 const AVATAR_GRADIENTS = [
@@ -39,14 +40,21 @@ function Avatar({ person }: { person: Person }) {
   const initial = (person.name.trim().charAt(0) || "U").toUpperCase();
   const avatarBg = getAvatarGradient(person.id || person.name);
   return (
-    <span
-      className="ms-avatar"
-      style={!hasImage ? { background: avatarBg, color: "#ffffff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 } : undefined}
-    >
-      {hasImage ? (
-        <img src={person.image!} alt="" loading="lazy" onError={() => setFailed(true)} />
-      ) : (
-        initial
+    <span className="relative inline-block">
+      <span
+        className="ms-avatar"
+        style={!hasImage ? { background: avatarBg, color: "#ffffff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 } : undefined}
+      >
+        {hasImage ? (
+          <img src={person.image!} alt="" loading="lazy" onError={() => setFailed(true)} />
+        ) : (
+          initial
+        )}
+      </span>
+      {person.isBrandAmbassador && (
+        <span className="absolute -bottom-1 -right-1 bg-[#071326] rounded-full p-0.5 border border-amber-400 shadow-xs z-10">
+          <BrandAmbassadorBadge size={14} showTooltip={false} />
+        </span>
       )}
     </span>
   );
@@ -126,7 +134,7 @@ function Chat({ partnerId, me, onBack, onUpdate }: { partnerId: string; me: Pers
   }
   const shown = messages.filter(m => !search || `${m.content} ${m.fileName || ""}`.toLowerCase().includes(search.toLowerCase()));
   return <section className="ms-chat" aria-label="Conversation">
-    <header className="ms-chat-header"><button className="ms-icon ms-back" aria-label="Back to inbox" onClick={onBack}><ArrowLeft01Icon size={20} /></button>{partner ? <Link className="ms-partner" href={`/member/${partner.profileSlug || partner.id}`}><Avatar person={partner} /><span><strong>{partner.name}</strong><small>{partner.headline || "View member profile"}</small></span></Link> : <span>Loading conversation…</span>}<div className="ms-header-actions"><button className="ms-icon" aria-label="Search this conversation" aria-pressed={searchOpen} onClick={() => { setSearchOpen(v => !v); setSearch(""); }}><Search01Icon size={20} /></button>{partner && <Link className="ms-icon" aria-label="View profile" href={`/member/${partner.profileSlug || partner.id}`}><UserCircleIcon size={21} /></Link>}</div></header>
+    <header className="ms-chat-header"><button className="ms-icon ms-back" aria-label="Back to inbox" onClick={onBack}><ArrowLeft01Icon size={20} /></button>{partner ? <Link className="ms-partner" href={`/member/${partner.profileSlug || partner.id}`}><Avatar person={partner} /><span><strong className="flex items-center gap-1">{partner.name}{partner.isBrandAmbassador && <BrandAmbassadorBadge size={16} />}</strong><small>{partner.headline || "View member profile"}</small></span></Link> : <span>Loading conversation…</span>}<div className="ms-header-actions"><button className="ms-icon" aria-label="Search this conversation" aria-pressed={searchOpen} onClick={() => { setSearchOpen(v => !v); setSearch(""); }}><Search01Icon size={20} /></button>{partner && <Link className="ms-icon" aria-label="View profile" href={`/member/${partner.profileSlug || partner.id}`}><UserCircleIcon size={21} /></Link>}</div></header>
     {searchOpen && <label className="ms-chat-search"><Search01Icon size={18} /><input aria-label="Search loaded messages" placeholder="Search loaded messages or files…" value={search} onChange={e => setSearch(e.target.value)} autoFocus /><small>{shown.length} results</small></label>}
     {error && <div className="ms-error" role="alert">{error}<button onClick={() => { setError(""); void refresh(); }}>Retry</button><button aria-label="Dismiss error" onClick={() => setError("")}><Cancel01Icon size={16} /></button></div>}
     <div className="ms-history" ref={viewport} onScroll={() => { const el = viewport.current; if (el) { nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100; if (nearBottom.current) setShowLatest(false); } }}>

@@ -360,18 +360,6 @@ function ProMarketingContent() {
           <div className="bg-white rounded-3xl border border-slate-200 p-8 space-y-6">
             <h2 className="text-xl font-black text-[#0a1628]">Define Your Audience</h2>
 
-            {/* Role filter */}
-            <div>
-              <label className="block text-sm font-bold text-[#0a1628] mb-3">Member Type <span className="text-slate-400 font-normal">(leave blank for all)</span></label>
-              <div className="flex flex-wrap gap-3">
-                {["MEMBER","PROFESSIONAL"].map(r => (
-                  <button key={r} onClick={() => toggleRole(r)}
-                    className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-all ${roles.includes(r) ? "bg-[#0a1628] text-white border-[#0a1628]" : "border-slate-200 text-slate-600 hover:border-[#0a1628]/30"}`}>
-                    {r === "MEMBER" ? "Members" : "Professionals"}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             {/* City filter */}
             <div>
