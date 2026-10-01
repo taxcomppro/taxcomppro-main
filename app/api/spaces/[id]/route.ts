@@ -81,6 +81,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     hasTicket: !!userTicket,
     ticketNumber: userTicket?.ticketNumber || null,
     userTicket,
+    isRsvped: Array.isArray((space as any).rsvps) && (space as any).rsvps.length > 0,
   });
 }
 

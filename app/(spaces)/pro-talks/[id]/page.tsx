@@ -76,6 +76,8 @@ interface Space {
   createdAt: string;
   host: SpaceHost;
   hostId: string;
+  isRsvped?: boolean;
+  rsvps?: { userId: string }[];
   _count?: { rsvps: number; attendances?: number };
 }
 
@@ -331,10 +333,25 @@ function ScheduledScreen({
   onOpenTicketDashboard: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
-  const [rsvped, setRsvped] = useState(false);
+  const [rsvped, setRsvped] = useState(
+    Boolean(
+      space.isRsvped ||
+      (Array.isArray(space.rsvps) && space.rsvps.length > 0)
+    )
+  );
   const [rsvping, setRsvping] = useState(false);
   const [rsvpCount, setRsvpCount] = useState(space._count?.rsvps ?? 0);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setRsvped(
+      Boolean(
+        space.isRsvped ||
+        (Array.isArray(space.rsvps) && space.rsvps.length > 0)
+      )
+    );
+    setRsvpCount(space._count?.rsvps ?? 0);
+  }, [space.isRsvped, space.rsvps, space._count?.rsvps]);
 
   const isPaid = isTicketedSpace(space);
   const hasTicket = Boolean(space.hasTicket);
@@ -406,11 +423,9 @@ function ScheduledScreen({
             <Clock className="w-4 h-4" /> {formatScheduled(space.scheduledAt)}
           </span>
         )}
-        {isHost && (
-          <span>
-            <Users className="w-4 h-4" /> {rsvpCount} {rsvpCount === 1 ? "person" : "people"} going
-          </span>
-        )}
+        <span>
+          <Users className="w-4 h-4" /> {rsvpCount} {rsvpCount === 1 ? "person" : "people"} going
+        </span>
       </div>
 
       {/* Ticket Confirmed Banner for Ticket Holders */}
@@ -480,6 +495,25 @@ function ScheduledScreen({
               </>
             )}
           </button>
+        )}
+
+        {!currentUserId && !isPaid && (
+          <>
+            <Link
+              id="unauth-signup-rsvp-btn"
+              href={accountUrl("/register", `/pro-talks/${space.id}`)}
+              className="ptr-btn ptr-btn--primary"
+            >
+              <Radio01Icon className="w-4 h-4" /> Sign Up to RSVP
+            </Link>
+            <Link
+              id="unauth-signin-btn"
+              href={accountUrl("/login", `/pro-talks/${space.id}`)}
+              className="ptr-btn ptr-btn--ghost"
+            >
+              Sign In to RSVP
+            </Link>
+          </>
         )}
 
         {shareUrl && (
