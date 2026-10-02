@@ -68,8 +68,8 @@ function PersonCard({ person, children }: { person: Person; children: ReactNode 
         )}
       </Link>
       {person.isBrandAmbassador && (
-        <div className="absolute top-2 right-2 bg-[#071326] rounded-full p-1 border border-amber-400/80 shadow-lg z-10">
-          <BrandAmbassadorBadge size={18} showTooltip={false} />
+        <div className="absolute top-2 right-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)] z-10 transition-transform duration-200 hover:scale-110" title="Official TCP Brand Ambassador">
+          <BrandAmbassadorBadge size={22} showTooltip={false} />
         </div>
       )}
     </div>

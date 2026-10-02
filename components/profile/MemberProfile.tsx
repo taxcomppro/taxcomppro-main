@@ -467,7 +467,16 @@ export default function MemberProfile() {
                   >
                     {avatarUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                   </button>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-[3px] border-white dark:border-[#172135] z-20 pointer-events-none" />
+                  {user?.isBrandAmbassador ? (
+                    <div
+                      className="absolute -bottom-2 -right-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)] z-20 transition-transform duration-200 hover:scale-110"
+                      title="Official TCP Brand Ambassador"
+                    >
+                      <BrandAmbassadorBadge size={30} showTooltip={false} />
+                    </div>
+                  ) : (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-[3px] border-white dark:border-[#172135] z-20 pointer-events-none" />
+                  )}
                 </div>
 
                 {/* Name & meta */}

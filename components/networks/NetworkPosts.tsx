@@ -21,8 +21,8 @@ function Avatar({ person }: { person?: Person | string | null }) {
     <span className="relative inline-block">
       {image ? <img className="np-avatar" src={image} alt="" /> : <span className="np-avatar np-avatar-fallback"><UserCircleIcon size={24} /></span>}
       {isAmbassador && (
-        <span className="absolute -bottom-1 -right-1 bg-[#071326] rounded-full p-0.5 border border-amber-400 shadow-xs z-10">
-          <BrandAmbassadorBadge size={14} showTooltip={false} />
+        <span className="absolute -bottom-1.5 -right-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)] z-10 transition-transform duration-200 hover:scale-110" title="Official TCP Brand Ambassador">
+          <BrandAmbassadorBadge size={16} showTooltip={false} />
         </span>
       )}
     </span>

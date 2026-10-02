@@ -486,10 +486,10 @@ export default function PublicMemberProfile({memberId: id, specialist}: {memberI
                 {/* Role / Verified Badge overlay on Avatar */}
                 {profile.isBrandAmbassador ? (
                   <div
-                    className="absolute -bottom-2 -right-2 bg-[#071326] rounded-full p-1 shadow-xl border-2 border-amber-400"
+                    className="absolute -bottom-2 -right-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.65)] z-20 transition-transform duration-200 hover:scale-110"
                     title="Official TCP Brand Ambassador"
                   >
-                    <BrandAmbassadorBadge size={26} showTooltip={false} />
+                    <BrandAmbassadorBadge size={30} showTooltip={false} />
                   </div>
                 ) : profile.hasDueDiligenceBadge ? (
                   <div

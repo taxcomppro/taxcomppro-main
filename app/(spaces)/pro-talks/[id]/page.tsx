@@ -24,6 +24,7 @@ import {
   Video,
   Mic,
   Lock,
+  UserPlus,
 } from "lucide-react";
 import { Radio01Icon } from "hugeicons-react";
 import SpaceRoom from "@/components/spaces/SpaceRoom";
@@ -31,6 +32,7 @@ import RsvpPanel from "@/components/spaces/RsvpPanel";
 import EditTalkDialog from "@/components/spaces/EditTalkDialog";
 import HostTicketSalesModal from "@/components/spaces/HostTicketSalesModal";
 import EndedTalkAttendanceSummary from "@/components/spaces/EndedTalkAttendanceSummary";
+import AdminRsvpModal from "@/components/spaces/AdminRsvpModal";
 import { isTicketedSpace } from "@/lib/ticketedProTalks";
 import { accountUrl } from "@/lib/auth-navigation";
 import "./talk-room.css";
@@ -316,6 +318,7 @@ function TicketedPurchaseScreen({
 function ScheduledScreen({
   space,
   isHost,
+  isAdmin = false,
   currentUserId,
   onStartNow,
   starting,
@@ -325,6 +328,7 @@ function ScheduledScreen({
 }: {
   space: Space;
   isHost: boolean;
+  isAdmin?: boolean;
   currentUserId: string;
   onStartNow: () => void;
   starting: boolean;
@@ -333,6 +337,7 @@ function ScheduledScreen({
   onOpenTicketDashboard: () => void;
 }) {
   const [showEdit, setShowEdit] = useState(false);
+  const [showAdminRsvp, setShowAdminRsvp] = useState(false);
   const [rsvped, setRsvped] = useState(
     Boolean(
       space.isRsvped ||
@@ -476,6 +481,17 @@ function ScheduledScreen({
           </>
         )}
 
+        {isAdmin && (
+          <button
+            id="admin-manual-rsvp-btn"
+            onClick={() => setShowAdminRsvp(true)}
+            className="ptr-btn !bg-gradient-to-r !from-lime-400/20 !to-emerald-400/20 !border-lime-400/60 !text-lime-300 hover:!from-lime-400/30 hover:!to-emerald-400/30 font-black shadow-md shadow-emerald-500/10"
+            title="Admin: Search & Manually RSVP Platform Members"
+          >
+            <UserPlus className="w-4 h-4 text-lime-400" /> Manually RSVP Member
+          </button>
+        )}
+
         {currentUserId && !isHost && !isPaid && (
           <button
             id="detail-rsvp-btn"
@@ -524,10 +540,15 @@ function ScheduledScreen({
         )}
       </div>
 
-      {isHost && !isPaid && (
+      {(isHost || isAdmin) && !isPaid && (
         <section className="ptr-host" aria-label="Confirmed RSVPs">
-          <p>Host · confirmed RSVPs</p>
-          <RsvpPanel spaceId={space.id} />
+          <p>{isAdmin && !isHost ? "Admin · Confirmed RSVPs & Attendees" : "Host · confirmed RSVPs"}</p>
+          <RsvpPanel
+            spaceId={space.id}
+            spaceName={space.name}
+            isAdmin={isAdmin}
+            onRsvpCountChanged={(c) => setRsvpCount(c)}
+          />
         </section>
       )}
 
@@ -538,6 +559,23 @@ function ScheduledScreen({
           onClose={() => setShowEdit(false)}
           onSaved={(updated) => onSpaceUpdated(updated)}
           onCancelled={(id) => onCancelled(id)}
+        />
+      )}
+
+      {isAdmin && (
+        <AdminRsvpModal
+          spaceId={space.id}
+          spaceName={space.name}
+          isOpen={showAdminRsvp}
+          onClose={() => setShowAdminRsvp(false)}
+          onRsvpUpdated={() => {
+            fetch(`/api/spaces/${space.id}/rsvp`)
+              .then((r) => r.json())
+              .then((data) => {
+                if (Array.isArray(data)) setRsvpCount(data.length);
+              })
+              .catch(() => {});
+          }}
         />
       )}
     </main>
@@ -887,6 +925,7 @@ export default function ProTalkPage() {
         <ScheduledScreen
           space={space}
           isHost={isHost}
+          isAdmin={isAdmin}
           currentUserId={userId}
           onStartNow={handleStartNow}
           starting={starting}

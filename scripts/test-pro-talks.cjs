@@ -18,7 +18,7 @@ let session = null;
 let grant;
 let tokenMetadata;
 let updates = [];
-const db = { spaceAttendance: { count: async () => 2 }, space: { findUnique: async () => space, update: async data => { updates.push(data); return space; } } };
+const db = { spaceAttendance: { count: async () => 2, updateMany: async () => ({ count: 1 }) }, space: { findUnique: async () => space, update: async data => { updates.push(data); return space; } } };
 const auth = { api: { getSession: async () => session } };
 class AccessToken { constructor(_, __, options) { this.options = options; tokenMetadata = JSON.parse(options.metadata || "{}"); } addGrant(value) { grant = value; } async toJwt() { return 'test-token'; } }
 let participantUpdate;

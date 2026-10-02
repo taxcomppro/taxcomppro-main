@@ -124,8 +124,8 @@ export default function FeedLeftPanel() {
                 : <span className="text-white font-black text-2xl">{user.name?.[0]?.toUpperCase()}</span>}
             </div>
             {user.isBrandAmbassador && (
-              <div className="absolute -bottom-1 -right-1 bg-[#071326] rounded-full p-0.5 border border-amber-400 shadow-md">
-                <BrandAmbassadorBadge size={20} showTooltip={false} />
+              <div className="absolute -bottom-2 -right-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)] z-20 transition-transform duration-200 hover:scale-110" title="Official TCP Brand Ambassador">
+                <BrandAmbassadorBadge size={24} showTooltip={false} />
               </div>
             )}
           </div>
