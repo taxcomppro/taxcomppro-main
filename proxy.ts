@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { hasPhoneNumber, phoneReturnPath } from "@/lib/phone-number";
 import { protectApiRequest } from "@/lib/request-security";
 
 // Pages anyone can visit without being logged in
@@ -82,8 +83,18 @@ export async function proxy(request: NextRequest) {
 
   // API protection runs before prefetch/static shortcuts; client headers cannot bypass it.
   if (pathname.startsWith("/api/")) {
-    const rejected = await protectApiRequest(request, async () => (await auth.api.getSession({ headers: request.headers }))?.user?.id);
-    return rejected || NextResponse.next();
+    let sessionPromise: ReturnType<typeof auth.api.getSession> | undefined;
+    const readSession = () => sessionPromise ??= auth.api.getSession({ headers: request.headers });
+    const rejected = await protectApiRequest(request, async () => (await readSession())?.user?.id);
+    if (rejected) return rejected;
+    const phoneExempt = pathname.startsWith("/api/auth/") || pathname === "/api/user/phone" || pathname === "/api/stripe/webhook" || pathname.startsWith("/api/cron/");
+    if (!phoneExempt && !["GET", "HEAD", "OPTIONS"].includes(request.method)) {
+      const session = await readSession();
+      if (session?.user && !hasPhoneNumber((session.user as { phone?: string | null }).phone)) {
+        return NextResponse.json({ error: "Please add your phone number to continue.", code: "PHONE_REQUIRED", redirectTo: "/complete-profile" }, { status: 403, headers: { "Cache-Control": "private, no-store" } });
+      }
+    }
+    return NextResponse.next();
   }
 
   // Static assets pass through. Route handlers retain their own authorization.
@@ -135,6 +146,12 @@ export async function proxy(request: NextRequest) {
     const dest = new URL("/login", request.url);
     dest.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(dest);
+  }
+
+  if (pathname !== "/complete-profile" && !hasPhoneNumber((session.user as { phone?: string | null }).phone)) {
+    const destination = new URL("/complete-profile", request.url);
+    destination.searchParams.set("next", phoneReturnPath(pathname + request.nextUrl.search));
+    return NextResponse.redirect(destination);
   }
 
   // Admin-only routes

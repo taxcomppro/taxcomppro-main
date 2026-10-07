@@ -8,6 +8,7 @@ import AtlasWidgetLoader from "@/components/AtlasWidgetLoader";
 import GhlChatWidget from "@/components/GhlChatWidget";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import SitePreferences from "@/components/SitePreferences";
+import PhoneRequirementGate from "@/components/auth/PhoneRequirementGate";
 
 
 const urbanist = Urbanist({
@@ -51,12 +52,14 @@ export default function RootLayout({
       <body className="bg-white dark:bg-[#0f172a] dark:text-slate-100" suppressHydrationWarning>
         <ThemeProvider>
           <ReduxProvider>
+            <PhoneRequirementGate>
             <Suspense>
               {children}
             </Suspense>
             <AtlasWidgetLoader />
             <GhlChatWidget />
             <SitePreferences />
+            </PhoneRequirementGate>
           </ReduxProvider>
         </ThemeProvider>
       </body>

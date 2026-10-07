@@ -27,6 +27,7 @@ export function clientNetwork(headers: Headers): string {
 
 export function ratePolicy(path: string, method: string): RatePolicy {
   if (/^\/api\/auth\/(?:sign-in|sign-up|forget-password|request-password-reset|reset-password)/.test(path)) return { key: "credentials", limit: 12, seconds: 900 };
+  if (path === "/api/user/phone" && method !== "GET") return { key: "phone-setup", limit: 10, seconds: 600 };
   if (path === "/api/auth/otp/send") return { key: "otp-send", limit: 15, seconds: 3600 };
   if (path === "/api/auth/otp/verify") return { key: "otp-verify", limit: 30, seconds: 900 };
   if (path.startsWith("/api/upload") || path === "/api/user/voice-memo") return { key: "uploads", limit: 40, seconds: 600 };
