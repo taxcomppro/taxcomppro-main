@@ -15,13 +15,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     const space = await prisma.space.findUnique({
       where: { id },
       include: {
-        ...(userId ? {
-          attendances: { where: { userId }, select: { userId: true } },
-          rsvps: { where: { userId }, select: { userId: true } },
-        } : {}),
+
+          attendances: { where: { userId: userId || "" }, select: { userId: true } },
+          rsvps: { where: { userId: userId || "" }, select: { userId: true } },
+          tickets: { where: { userId: userId || "", status: "CONFIRMED" }, select: { userId: true, status: true } },
+          network: { select: { members: { where: { userId: userId || "" }, select: { userId: true, status: true } } } },
+
       },
     });
     if (!space) return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    if (!space.isLive || space.endedAt) return NextResponse.json({ error: "This talk has ended or has not started" }, { status: 409 });
     if (!canAccessSpace(req, space, session?.user)) return NextResponse.json({ error: "Invitation required" }, { status: 403 });
 
     if (userId) {
@@ -48,12 +51,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       where: { spaceId: id },
     });
 
+    const concurrentCount = await prisma.spaceAttendance.count({ where: { spaceId: id, leftAt: null } });
     const currentTotal = Math.max(uniqueCount, space.totalAttendees);
     const updated = await prisma.space.update({
       where: { id },
       data: {
         totalAttendees: currentTotal,
-        peakAttendees: Math.max(space.peakAttendees, currentTotal),
+        peakAttendees: Math.max(space.peakAttendees, concurrentCount),
       },
       select: {
         totalAttendees: true,
@@ -97,7 +101,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     if (!space) return NextResponse.json({ error: "Space not found" }, { status: 404 });
     if (!canAccessSpace(req, space, session?.user)) return NextResponse.json({ error: "Invitation required" }, { status: 403 });
 
-    const isHost = session?.user?.id === space.hostId || session?.user?.role === "ADMIN";
+    const isHost = session?.user?.id === space.hostId || space.coHostIds.includes(session?.user?.id || "") || session?.user?.role === "ADMIN";
 
     // If host/admin, get attendee list
     let attendees: unknown[] = [];

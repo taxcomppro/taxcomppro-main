@@ -26,6 +26,9 @@ export async function POST(
   });
   if (!enrollment) return NextResponse.json({ error: "Not enrolled" }, { status: 403 });
 
+  const lesson = await prisma.lesson.findFirst({ where: { id: lessonId, section: { courseId: course.id } }, select: { id: true } });
+  if (!lesson) return NextResponse.json({ error: "Lesson not found in this course" }, { status: 404 });
+
   // Get quiz
   const quiz = await prisma.quiz.findUnique({
     where: { lessonId },

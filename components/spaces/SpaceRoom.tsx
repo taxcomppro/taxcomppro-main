@@ -1,4 +1,5 @@
 "use client";
+import { downloadAttendance } from "@/lib/download-attendance";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import ScreenShareView from "./ScreenShareView";
@@ -656,10 +657,12 @@ function SessionEndModal({
 }) {
   const [downloading, setDownloading] = useState(false);
 
-  const handleExport = () => {
-    setDownloading(true);
-    window.location.href = `/api/spaces/${spaceId}/export-attendees?format=csv`;
-    setTimeout(() => setDownloading(false), 2000);
+  const [exportError, setExportError] = useState("");
+  const handleExport = async () => {
+    setDownloading(true); setExportError("");
+    try { await downloadAttendance(`/api/spaces/${spaceId}/export-attendees?format=csv`); }
+    catch (error) { setExportError(error instanceof Error ? error.message : "Export failed. Please retry."); }
+    finally { setDownloading(false); }
   };
 
   return (
@@ -674,6 +677,7 @@ function SessionEndModal({
         <p className="text-emerald-300/80 text-xs mb-6">
           Here is how your stage performed
         </p>
+        {exportError && <p role="alert" className="text-red-300 mb-4">{exportError}</p>}
 
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3">
@@ -1457,14 +1461,7 @@ function RoomInner({ space, isAdmin, userId, onEnd, ending }: Props) {
   const handleHostEnd = useCallback(async () => {
     if (!isHost && !isAdmin) return;
     try {
-      const res = await fetch(`/api/spaces/${space.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Unable to end this room.");
-      if (data.summary) {
-        setSessionSummary(data.summary);
-      } else {
-        onEnd();
-      }
+      await onEnd();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to end this room. Please try again.");
     }
@@ -2515,6 +2512,12 @@ export default function SpaceRoom({
   ending,
 }: Props) {
   const [connected, setConnected] = useState(false);
+  useEffect(() => {
+    if (!connected || !userId) return;
+    const leave = () => { fetch(`/api/spaces/${space.id}/attendance`, { method: "PATCH", keepalive: true }).catch(() => {}); };
+    window.addEventListener("pagehide", leave);
+    return () => window.removeEventListener("pagehide", leave);
+  }, [connected, userId, space.id]);
   const lkUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL ?? "";
   const router = useRouter();
 
@@ -2525,8 +2528,22 @@ export default function SpaceRoom({
       connect={true}
       audio={false}
       video={false}
-      onConnected={() => setConnected(true)}
-      onDisconnected={() => router.push("/pro-talks")}
+      onConnected={() => {
+        setConnected(true);
+        fetch(`/api/spaces/${space.id}/attendance`, { method: "POST", keepalive: true }).catch(() => {});
+      }}
+      onDisconnected={async () => {
+        fetch(`/api/spaces/${space.id}/attendance`, { method: "PATCH", keepalive: true }).catch(() => {});
+        const managesTalk = isAdmin || space.hostId === userId || space.coHostIds?.includes(userId || "");
+        if (managesTalk) {
+          try {
+            const response = await fetch(`/api/spaces/${space.id}`, { cache: "no-store" });
+            const ended = await response.json();
+            if (response.ok && ended.endedAt) { window.location.replace(`/pro-talks/${space.id}`); return; }
+          } catch { /* Return to the directory if the report cannot be loaded. */ }
+        }
+        router.push("/pro-talks");
+      }}
       className="sr-livekit"
       style={{
         position: "fixed",

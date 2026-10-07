@@ -166,7 +166,7 @@ function getCategoryIconByName(name: string, className = "w-3.5 h-3.5 shrink-0")
   return <CategoryIcon slug={cat?.slug} className={className} />;
 }
 
-type TabType = "all" | "live" | "upcoming" | "ticketed" | "my-tickets" | "following" | "popular";
+type TabType = "my-talks" | "all" | "live" | "upcoming" | "ticketed" | "my-tickets" | "following" | "popular";
 
 function timeAgo(d: string) {
   const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
@@ -697,6 +697,7 @@ function ProTalksInner() {
     return t === "live" ||
       t === "upcoming" ||
       t === "ticketed" ||
+      t === "my-talks" ||
       t === "my-tickets" ||
       t === "following" ||
       t === "popular"
@@ -753,6 +754,7 @@ function ProTalksInner() {
     { id: "upcoming", label: "Upcoming", icon: Calendar03Icon, count: upcomingSpaces.length },
     { id: "ticketed", label: "Ticketed Workshops", icon: Ticket },
     { id: "my-tickets", label: "My Tickets", icon: Receipt },
+    { id: "my-talks", label: "My Talks", icon: Mic },
     { id: "following", label: "Following", icon: StarIcon },
     { id: "popular", label: "Popular / Trending", icon: FireIcon },
   ];
@@ -817,7 +819,14 @@ function ProTalksInner() {
 
   const mixedCards = (list: Space[]) =>
     list.map((space) =>
-      space.isLive ? (
+      space.endedAt && activeTab === "my-talks" ? (
+        <article key={space.id} className="ptd-card p-6 flex flex-col gap-4">
+          <span className="text-sm opacity-70">Ended · {new Date(space.endedAt).toLocaleDateString()}</span>
+          <h3 className="text-xl font-semibold">{space.name}</h3>
+          <p className="text-sm opacity-70">Hosted by {space.host.name} · {space._count.attendances ?? space.totalAttendees} joined</p>
+          <Link className="ptd-secondary" href={`/pro-talks/${space.id}`}>View attendance & export <ArrowRight className="w-4 h-4" /></Link>
+        </article>
+      ) : space.isLive ? (
         <LiveCard key={space.id} space={space} currentUserId={user?.id ?? ""} />
       ) : (
         <UpcomingCard
@@ -1038,6 +1047,8 @@ function ProTalksInner() {
             )
           ) : activeTab === "ticketed" ? (
             spaces.length === 0 ? ticketedEmpty : <div className="ptd-grid">{mixedCards(spaces)}</div>
+          ) : activeTab === "my-talks" ? (
+            spaces.length === 0 ? <div className="ptd-empty"><strong>No hosted talks found</strong><p>Your hosted and co-hosted talks, including past attendance reports, appear here.</p></div> : <div className="ptd-grid">{mixedCards(spaces)}</div>
           ) : activeTab === "my-tickets" ? (
             spaces.length === 0 ? myTicketsEmpty : <div className="ptd-grid">{mixedCards(spaces)}</div>
           ) : spaces.length === 0 ? (

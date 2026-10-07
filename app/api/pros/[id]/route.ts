@@ -1,3 +1,4 @@
+import { countHostedProTalks } from "@/lib/hosted-pro-talks";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { directoryUserWhere } from "@/lib/proDirectory";
@@ -80,9 +81,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     prisma.proNetworkDiscussion.count({
       where: { authorId: id },
     }),
-    prisma.proNetworkEvent.count({
-      where: { hostId: id },
-    }),
+    countHostedProTalks(id),
     prisma.userFollow.count({ where: { followingId: id } }),
   ]);
 

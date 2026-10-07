@@ -1,3 +1,4 @@
+import { safeRichText } from "@/lib/safe-rich-text";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -97,6 +98,17 @@ export async function GET(
 
   return NextResponse.json({
     ...course,
+    sections: course.sections.map(section => ({ ...section, lessons: section.lessons.map(lesson => {
+      const canRead = isEnrolled || lesson.isFree;
+      return { ...lesson,
+        videoUrl: canRead ? lesson.videoUrl : null,
+        downloadUrl: canRead ? lesson.downloadUrl : null,
+        textContent: canRead && lesson.textContent ? safeRichText(lesson.textContent) : null,
+        quiz: canRead && lesson.quiz ? { ...lesson.quiz, questions: lesson.quiz.questions.map(question => ({
+          id: question.id, question: question.question, options: question.options, order: question.order,
+        })) } : null,
+      };
+    }) })),
     totalLessons,
     isEnrolled,
     completedLessonIds,

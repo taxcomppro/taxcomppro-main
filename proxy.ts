@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { protectApiRequest } from "@/lib/request-security";
 
 // Pages anyone can visit without being logged in
 const PUBLIC_PAGES = new Set([
@@ -63,7 +64,9 @@ function nextResponseWithReferralCookie(request: NextRequest) {
 }
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  let pathname: string;
+  try { pathname = decodeURIComponent(request.nextUrl.pathname); }
+  catch { return NextResponse.json({ error: "Invalid request path" }, { status: 400 }); }
 
   // Email sign-up must go through /api/auth/otp/verify, which only creates the account
   // after the emailed code is accepted. Blocking better-auth's public sign-up endpoint
@@ -77,7 +80,13 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  // Always pass through: static assets & all API routes (auth is enforced at the route level)
+  // API protection runs before prefetch/static shortcuts; client headers cannot bypass it.
+  if (pathname.startsWith("/api/")) {
+    const rejected = await protectApiRequest(request, async () => (await auth.api.getSession({ headers: request.headers }))?.user?.id);
+    return rejected || NextResponse.next();
+  }
+
+  // Static assets pass through. Route handlers retain their own authorization.
   if (
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||

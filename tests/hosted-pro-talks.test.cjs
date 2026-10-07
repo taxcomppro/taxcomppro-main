@@ -1,0 +1,7 @@
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('node:assert/strict');
+const root=process.env.TAXCOMPRO_TEST_ROOT||path.resolve(__dirname,'..'),ts=require(path.join(root,'node_modules/typescript'));
+let spaces=[],events=[];
+const prisma={space:{findMany:async({where})=>{assert.deepEqual(where,{hostId:'host'});return spaces;}},proNetworkEvent:{findMany:async({where})=>{assert.deepEqual(where,{hostId:'host'});return events;}}};
+const m={exports:{}};const code=ts.transpileModule(fs.readFileSync(path.join(root,'lib/hosted-pro-talks.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+vm.runInThisContext('(function(require,module,exports){'+code+'})')(()=>({prisma}),m,m.exports);
+(async()=>{const count=()=>m.exports.countHostedProTalks('host');assert.equal(await count(),0);spaces=[{roomName:'completed-talk'},{roomName:'live-talk'}];assert.equal(await count(),2);events=[{id:'network-one',roomName:'completed-talk'},{id:'network-two',roomName:null},{id:'network-three',roomName:null}];assert.equal(await count(),4);events.push({id:'network-four',roomName:'external-room'});assert.equal(await count(),5);console.log('PASS: main talks included, completed talks retained, network rooms deduplicated, independent network events counted, and both queries scoped to the host.');})().catch(e=>{console.error(e);process.exitCode=1});

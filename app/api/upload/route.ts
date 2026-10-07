@@ -1,3 +1,4 @@
+import { validateUploads } from "@/lib/upload-security";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
       "licenses": "taxcomppro/licenses",
       "documents": "taxcomppro/documents",
     };
+    if (!/^(?:taxcomppro\/)?[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+){0,3}$/.test(folder)) return NextResponse.json({ error: "Invalid upload folder" }, { status: 400 });
     const cloudFolder = folderMap[folder] ?? (folder.startsWith("taxcomppro/") ? folder : `taxcomppro/${folder}`);
 
     if (!files.length) {
@@ -59,6 +61,9 @@ export async function POST(req: NextRequest) {
     if (files.length > 4) {
       return NextResponse.json({ error: "Max 4 files allowed per upload" }, { status: 400 });
     }
+
+  const uploadError = await validateUploads(files, 25 * 1024 * 1024);
+  if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
     const urls: string[] = [];
 
@@ -75,8 +80,9 @@ export async function POST(req: NextRequest) {
             .webp({ quality: 88 })
             .toBuffer();
           buffer = Buffer.from(sharpBuffer);
-        } catch (sharpErr) {
-          console.warn("Sharp optimization skipped, using raw buffer:", sharpErr);
+        } catch {
+          console.warn("Invalid image upload rejected");
+          return NextResponse.json({ error: "This image could not be processed." }, { status: 400 });
         }
       }
 
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: urls[0], urls });
   } catch (err: unknown) {
     console.error("Cloudinary upload error:", err);
-    const message = err instanceof Error ? err.message : "Failed to upload file";
+    const message = "Failed to upload file. Please try again.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

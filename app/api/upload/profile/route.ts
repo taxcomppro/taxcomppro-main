@@ -1,3 +1,4 @@
+import { validateUploads } from "@/lib/upload-security";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
 
   if (!files.length) return NextResponse.json({ error: "No files" }, { status: 400 });
   if (files.length > 10) return NextResponse.json({ error: "Max 10 images" }, { status: 400 });
+
+  const uploadError = await validateUploads(files, 25 * 1024 * 1024);
+  if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
   const folderMap: Record<string, string> = {
     avatar: "taxcomppro/avatars",
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
   } catch (error) {
     console.error("[upload/profile] Cloudinary upload failed", error);
-    const message = (error as { message?: string })?.message || "Upload failed";
+    const message = "Please try again.";
     return NextResponse.json({ error: `Upload failed: ${message}` }, { status: 502 });
   }
 

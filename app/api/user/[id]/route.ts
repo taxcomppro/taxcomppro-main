@@ -1,3 +1,4 @@
+import { countHostedProTalks } from "@/lib/hosted-pro-talks";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -97,7 +98,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       select: { role: true, network: { select: networkCardSelect } },
     }),
     prisma.proNetworkDiscussion.count({ where: { authorId: id } }),
-    prisma.proNetworkEvent.count({ where: { hostId: id } }),
+    countHostedProTalks(id),
     // Photos/videos from public feed posts (no group posts, nothing still scheduled).
     prisma.post.findMany({
       where: {

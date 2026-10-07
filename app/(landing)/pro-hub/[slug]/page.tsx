@@ -288,10 +288,11 @@ export default function ForumDetailPage({ params }: { params: Promise<{ slug: st
   // Auto-init: for irs-updates forum, ensure forum+posts exist before loading
   useEffect(() => {
     if (slug !== "irs-updates") { setInitializing(false); return; }
-    fetch("/api/pro-hub/irs-updates/auto-init")
+    if (user?.role !== "ADMIN") { setInitializing(false); load(); return; }
+    fetch("/api/pro-hub/irs-updates/auto-init", { method: "POST" })
       .finally(() => { setInitializing(false); load(); });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [slug, user?.role]);
 
   return (
     <div className="min-h-screen bg-[#f4f6fb]">

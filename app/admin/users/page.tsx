@@ -121,7 +121,7 @@ type SubStatusFilter = "ALL" | "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "FREE";
 type JoinedFilter = "ALL" | "TODAY" | "7_DAYS" | "30_DAYS" | "90_DAYS" | "OLDER_90";
 type AvatarFilter = "ALL" | "WITH_AVATAR" | "NO_AVATAR";
 
-export function getUserProductSummary(u: User) {
+function getUserProductSummary(u: User) {
   const tks = u.toolkitPurchases || [];
   const enrs = u.enrollments || [];
   const hasBundlePlus = tks.some(

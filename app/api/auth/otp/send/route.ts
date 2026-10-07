@@ -1,3 +1,4 @@
+import { enforceRateLimit } from "@/lib/request-security";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -8,31 +9,6 @@ const bodySchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   name: z.string().trim().min(1).max(120).optional(),
 });
-
-// Coarse per-IP throttle so one host cannot enumerate addresses or burn the mail quota.
-// Per-address throttling is handled by the resend cooldown in lib/otp.
-const IP_WINDOW_MS = 60 * 60 * 1000;
-const IP_MAX_SENDS = 15;
-const ipHits = new Map<string, number[]>();
-
-function ipThrottled(ip: string): boolean {
-  const now = Date.now();
-  const hits = (ipHits.get(ip) ?? []).filter((t) => now - t < IP_WINDOW_MS);
-  if (hits.length >= IP_MAX_SENDS) {
-    ipHits.set(ip, hits);
-    return true;
-  }
-  hits.push(now);
-  ipHits.set(ip, hits);
-
-  // Opportunistic cleanup so the map cannot grow without bound.
-  if (ipHits.size > 5000) {
-    for (const [key, times] of ipHits) {
-      if (times.every((t) => now - t >= IP_WINDOW_MS)) ipHits.delete(key);
-    }
-  }
-  return false;
-}
 
 export async function POST(request: NextRequest) {
   let parsed;
@@ -49,19 +25,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-
-  if (ipThrottled(ip)) {
-    return NextResponse.json(
-      { error: "Too many verification requests. Please try again later." },
-      { status: 429 }
-    );
-  }
-
   const email = normalizeEmail(parsed.data.email);
+  const limited = await enforceRateLimit(`email:${email}`, { key: "otp-address", limit: 5, seconds: 3600 });
+  if (limited) return limited;
 
   // An address that already has an account should go to sign-in, not get a new code.
   const existingUser = await prisma.user.findUnique({

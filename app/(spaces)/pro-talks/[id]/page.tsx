@@ -736,7 +736,7 @@ export default function ProTalkPage() {
         }
       } else {
         setToken(tokenData.token as string);
-        fetch(`/api/spaces/${id}/attendance`, { method: "POST" }).catch(() => {});
+
       }
     } catch {
       setError("Failed to load Pro Talk");
@@ -788,7 +788,7 @@ export default function ProTalkPage() {
         return;
       }
       setToken(data.token as string);
-      fetch(`/api/spaces/${id}/attendance`, { method: "POST" }).catch(() => {});
+
     } catch {
       setError("Failed to join as guest.");
     } finally {
@@ -802,22 +802,8 @@ export default function ProTalkPage() {
     try {
       const res = await fetch(`/api/spaces/${id}`, { method: "DELETE" });
       const data = await res.json();
-      if (res.ok && data) {
-        setSpace((prev) =>
-          prev
-            ? {
-                ...prev,
-                ...data,
-                isLive: false,
-                endedAt: data.endedAt || new Date().toISOString(),
-              }
-            : data
-        );
-      } else {
-        setSpace((prev) =>
-          prev ? { ...prev, isLive: false, endedAt: new Date().toISOString() } : prev
-        );
-      }
+      if (!res.ok) throw new Error(data.error || "Unable to end this talk. Please retry.");
+      setSpace(prev => prev ? { ...prev, ...data } : data);
     } finally {
       setEnding(false);
     }
@@ -840,7 +826,7 @@ export default function ProTalkPage() {
           const tokenData = await tokenRes.json();
           if (tokenData.token) {
             setToken(tokenData.token);
-            fetch(`/api/spaces/${id}/attendance`, { method: "POST" }).catch(() => {});
+
           }
         }
       }

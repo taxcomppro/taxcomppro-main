@@ -1,3 +1,4 @@
+import { validateUploads } from "@/lib/upload-security";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
@@ -21,6 +22,9 @@ export async function POST(req: NextRequest) {
 
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+
+  const uploadError = await validateUploads([file], 15 * 1024 * 1024);
+  if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
   // 15 MB server-side limit
   if (file.size > 15 * 1024 * 1024)

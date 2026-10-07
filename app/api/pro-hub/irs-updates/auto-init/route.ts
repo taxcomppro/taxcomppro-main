@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -55,7 +56,11 @@ async function scrapeIrsNews() {
 // GET /api/pro-hub/irs-updates/auto-init
 // Called by the client on first load — creates the IRS Updates forum if needed,
 // syncs latest news as ForumPosts, then returns { forumExists: true, created: N }
-export async function GET() {
+export async function POST(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const actor = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+  if (actor?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     // 1. Find the first admin user to author the posts
     const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true } });

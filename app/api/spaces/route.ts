@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       });
     } else if (tab === "my-talks" || tab === "hosted") {
       if (!userId) return NextResponse.json([]);
-      andConditions.push({ hostId: userId });
+      andConditions.push({ OR: [{ hostId: userId }, { coHostIds: { has: userId } }] });
     } else if (publicOnly) {
       andConditions.push({
         OR: [{ visibility: "PUBLIC" }, { visibility: "TICKETED" }, { accessType: "PAID" }, { accessType: "TICKETED" }],

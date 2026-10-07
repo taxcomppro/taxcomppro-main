@@ -17,7 +17,7 @@ async function requireAdmin(req: NextRequest) {
 }
 
 // Canonical list of all toolkits, courses, and bundles
-export const ALL_TOOLKITS = TOOLKITS.map((t) => ({
+const ALL_TOOLKITS = TOOLKITS.map((t) => ({
   id: t.id,
   name: t.name,
   category: t.category,
@@ -29,7 +29,7 @@ export const ALL_TOOLKITS = TOOLKITS.map((t) => ({
   membershipMonths: t.membershipMonths,
 }));
 
-export const ALL_COURSES = COURSES.map((c) => ({
+const ALL_COURSES = COURSES.map((c) => ({
   id: c.id,
   slug: c.slug,
   title: c.title,
@@ -43,7 +43,7 @@ export const ALL_COURSES = COURSES.map((c) => ({
   totalLessons: c.totalLessons,
 }));
 
-export const ALL_BUNDLES = BUNDLES.map((b) => ({
+const ALL_BUNDLES = BUNDLES.map((b) => ({
   id: b.id,
   name: b.name,
   tagline: b.tagline,
@@ -56,7 +56,7 @@ export const ALL_BUNDLES = BUNDLES.map((b) => ({
   features: b.features,
 }));
 
-export const COURSE_ALIAS_MAP: Record<string, string[]> = {
+const COURSE_ALIAS_MAP: Record<string, string[]> = {
   "30-day-launch": ["30-day-launch", "30-day-tax-office-launch", "30-day-tax-office", "30daylaunch", "cmooyt4qz000004l2hgvycccx"],
   "30-day-tax-office-launch": ["30-day-launch", "30-day-tax-office-launch", "30-day-tax-office", "30daylaunch", "cmooyt4qz000004l2hgvycccx"],
   "irs-fine-defense": ["irs-fine-defense", "irs-fine-defense-masterclass", "irsfinedefense", "cmop0lsdi000304jyzlcpvi78"],
@@ -71,7 +71,7 @@ export const COURSE_ALIAS_MAP: Record<string, string[]> = {
   "staff-audit-ready-due-diligence": ["due-diligence", "due-diligence-course", "staff-audit-ready", "staff-audit-ready-due-diligence"],
 };
 
-export const TOOLKIT_ALIAS_MAP: Record<string, string[]> = {
+const TOOLKIT_ALIAS_MAP: Record<string, string[]> = {
   "30-day-tax-office": ["30-day-tax-office", "30-day-tax-office-launch", "30-day-launch", "30daylaunch"],
   "due-diligence-course": ["due-diligence-course", "due-diligence", "staff-audit-ready", "staff-audit-ready-due-diligence"],
   "irs-fine-defense": ["irs-fine-defense", "irsfinedefense", "irs-fine-defense-masterclass"],

@@ -1,25 +1,22 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { downloadAttendance } from "@/lib/download-attendance";
 import {
   Download,
   Users,
   Search,
-  Clock,
-  CheckCircle2,
+  Radio,
   Calendar,
-  Building2,
   Briefcase,
   Mail,
   Phone,
-  Radio,
   FileSpreadsheet,
   Loader2,
   RefreshCw,
-  Sparkles,
   ArrowLeft,
-  ChevronDown,
+  Building2,
   ShieldCheck,
 } from "lucide-react";
 
@@ -75,35 +72,27 @@ export default function EndedTalkAttendanceSummary({
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [exporting, setExporting] = useState(false);
 
-  const fetchMembers = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/spaces/${space.id}/export-attendees?format=json`);
-      if (!res.ok) {
-        throw new Error("Failed to load attendee records");
-      }
-      const data = await res.json();
-      setMembers(data.members || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load attendee data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchMembers = useCallback(() => {
+    return fetch(`/api/spaces/${space.id}/export-attendees?format=json`, { cache: "no-store" })
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to load attendee records");
+        return data;
+      })
+      .then(data => { setMembers(data.members || []); setError(null); })
+      .catch(err => setError(err instanceof Error ? err.message : "Failed to load attendee data"))
+      .finally(() => setLoading(false));
+  }, [space.id]);
 
   useEffect(() => {
     fetchMembers();
-  }, [space.id]);
+  }, [fetchMembers]);
 
-  const handleExportCsv = () => {
-    setExporting(true);
-    try {
-      // Trigger native browser download for CSV endpoint
-      window.location.href = `/api/spaces/${space.id}/export-attendees?format=csv`;
-    } finally {
-      setTimeout(() => setExporting(false), 1500);
-    }
+  const handleExportCsv = async () => {
+    setExporting(true); setError(null);
+    try { await downloadAttendance(`/api/spaces/${space.id}/export-attendees?format=csv`); }
+    catch (err) { setError(err instanceof Error ? err.message : "Export failed. Please retry."); }
+    finally { setExporting(false); }
   };
 
   const filteredMembers = useMemo(() => {
@@ -135,7 +124,7 @@ export default function EndedTalkAttendanceSummary({
       {/* Top Breadcrumb & Navigation */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <Link
-          href="/pro-talks"
+          href="/pro-talks?tab=my-talks"
           className="inline-flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Pro Talks
@@ -210,7 +199,7 @@ export default function EndedTalkAttendanceSummary({
               )}
             </button>
             <button
-              onClick={fetchMembers}
+              onClick={() => { setLoading(true); setError(null); fetchMembers(); }}
               disabled={loading}
               className="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all flex items-center justify-center"
               title="Refresh attendance records"
@@ -301,6 +290,7 @@ export default function EndedTalkAttendanceSummary({
         </div>
       </div>
 
+      {error && <p role="alert" className="mb-4 rounded-xl border border-red-400/40 bg-red-500/10 p-4 text-red-300">{error}</p>}
       {/* Data Table */}
       <div className="rounded-3xl bg-[#051324]/90 border border-emerald-500/30 overflow-hidden shadow-xl shadow-black/40">
         <div className="overflow-x-auto">
@@ -313,9 +303,9 @@ export default function EndedTalkAttendanceSummary({
                 <th className="py-3.5 px-4">Email</th>
                 <th className="py-3.5 px-4">Phone</th>
                 <th className="py-3.5 px-4">RSVP Status</th>
-                <th className="py-3.5 px-4">Time In</th>
-                <th className="py-3.5 px-4">Time Out</th>
-                <th className="py-3.5 px-4 text-right">Duration</th>
+                <th className="py-3.5 px-4">Time In (UTC)</th>
+                <th className="py-3.5 px-4">Time Out (UTC)</th>
+                <th className="py-3.5 px-4 text-right">First-to-last visit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-emerald-500/10 text-slate-200">

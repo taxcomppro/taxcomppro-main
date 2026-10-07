@@ -63,9 +63,12 @@ export interface CreateOtpResult {
  * Returns `ok: false` with `retryAfter` while the resend cooldown is active.
  */
 export async function createOtp(email: string): Promise<CreateOtpResult> {
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"email-otp:" + normalizeEmail(email)}))`;
   const identifier = OTP_PREFIX + normalizeEmail(email);
 
-  const existing = await prisma.verification.findFirst({
+  const existing = await tx.verification.findFirst({
     where: { identifier },
     orderBy: { createdAt: "desc" },
   });
@@ -81,8 +84,8 @@ export async function createOtp(email: string): Promise<CreateOtpResult> {
   const payload: StoredOtp = { hash: hashCode(normalizeEmail(email), code), attempts: 0 };
 
   // Replace rather than accumulate, so only the newest code is ever live.
-  await prisma.verification.deleteMany({ where: { identifier } });
-  await prisma.verification.create({
+  await tx.verification.deleteMany({ where: { identifier } });
+  await tx.verification.create({
     data: {
       identifier,
       value: JSON.stringify(payload),
@@ -91,6 +94,7 @@ export async function createOtp(email: string): Promise<CreateOtpResult> {
   });
 
   return { ok: true, code };
+  });
 }
 
 export type VerifyOtpReason = "invalid" | "expired" | "too_many_attempts" | "not_found";
@@ -106,10 +110,13 @@ export interface VerifyOtpResult {
  * MAX_ATTEMPTS. On success the code is consumed so it cannot be replayed.
  */
 export async function verifyOtp(email: string, code: string): Promise<VerifyOtpResult> {
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"email-otp:" + normalizeEmail(email)}))`;
   const normalized = normalizeEmail(email);
   const identifier = OTP_PREFIX + normalized;
 
-  const row = await prisma.verification.findFirst({
+  const row = await tx.verification.findFirst({
     where: { identifier },
     orderBy: { createdAt: "desc" },
   });
@@ -117,7 +124,7 @@ export async function verifyOtp(email: string, code: string): Promise<VerifyOtpR
   if (!row) return { ok: false, reason: "not_found" };
 
   if (row.expiresAt.getTime() < Date.now()) {
-    await prisma.verification.deleteMany({ where: { identifier } });
+    await tx.verification.deleteMany({ where: { identifier } });
     return { ok: false, reason: "expired" };
   }
 
@@ -125,25 +132,25 @@ export async function verifyOtp(email: string, code: string): Promise<VerifyOtpR
   try {
     stored = JSON.parse(row.value) as StoredOtp;
   } catch {
-    await prisma.verification.deleteMany({ where: { identifier } });
+    await tx.verification.deleteMany({ where: { identifier } });
     return { ok: false, reason: "not_found" };
   }
 
   if (stored.attempts >= MAX_ATTEMPTS) {
-    await prisma.verification.deleteMany({ where: { identifier } });
+    await tx.verification.deleteMany({ where: { identifier } });
     return { ok: false, reason: "too_many_attempts" };
   }
 
   const submitted = code.replace(/\D/g, "");
   if (!safeEqual(hashCode(normalized, submitted), stored.hash)) {
     const attempts = stored.attempts + 1;
-    await prisma.verification.update({
+    await tx.verification.update({
       where: { id: row.id },
       data: { value: JSON.stringify({ ...stored, attempts }) },
     });
     const attemptsLeft = MAX_ATTEMPTS - attempts;
     if (attemptsLeft <= 0) {
-      await prisma.verification.deleteMany({ where: { identifier } });
+      await tx.verification.deleteMany({ where: { identifier } });
       return { ok: false, reason: "too_many_attempts", attemptsLeft: 0 };
     }
     return { ok: false, reason: "invalid", attemptsLeft };
@@ -151,7 +158,8 @@ export async function verifyOtp(email: string, code: string): Promise<VerifyOtpR
 
   // Correct code: burn it so it cannot be replayed. The caller creates the account
   // in the same request, so no separate proof-of-verification marker is needed.
-  await prisma.verification.deleteMany({ where: { identifier } });
+  await tx.verification.deleteMany({ where: { identifier } });
 
   return { ok: true };
+  });
 }

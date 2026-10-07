@@ -21,6 +21,10 @@ export async function POST(
   });
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
 
+  if (!course.sections.some(section => section.lessons.some(lesson => lesson.id === lessonId))) {
+    return NextResponse.json({ error: "Lesson not found in this course" }, { status: 404 });
+  }
+
   let enrollment = await prisma.enrollment.findUnique({
     where: { userId_courseId: { userId: session.user.id, courseId: course.id } },
     include: { progress: { select: { lessonId: true } } },

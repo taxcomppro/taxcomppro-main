@@ -1,3 +1,4 @@
+import { validateUploads } from "@/lib/upload-security";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
   const file     = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "File too large (max 30 MB)" }, { status: 400 });
+
+  const uploadError = await validateUploads([file], MAX_BYTES);
+  if (uploadError) return NextResponse.json({ error: uploadError }, { status: 400 });
 
   const allowedTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/webm", "audio/ogg", "audio/mp4", "audio/x-m4a"];
   if (!allowedTypes.includes(file.type) && !file.type.startsWith("audio/")) {

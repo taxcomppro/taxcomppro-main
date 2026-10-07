@@ -229,6 +229,17 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ success: true, message: "Talk cancelled and removed" });
   }
 
+  // Persist the report before disconnecting clients; repeat end requests retain the original end time.
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.space.updateMany({ where: { id, endedAt: null }, data: { isLive: false, endedAt: new Date() } });
+    const ended = await tx.space.findUniqueOrThrow({ where: { id }, include: {
+      host: { select: HOST_SELECT },
+      network: { select: { id: true, name: true, slug: true, logoImage: true } },
+    } });
+    await tx.spaceAttendance.updateMany({ where: { spaceId: id, leftAt: null }, data: { leftAt: ended.endedAt } });
+    return ended;
+  });
+
   // End LiveKit room if active
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -244,26 +255,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
   }
 
-  const endedDate = new Date();
-
-  // Mark Time Out (leftAt) for all attendees who were still in the session
-  await prisma.spaceAttendance.updateMany({
-    where: { spaceId: id, leftAt: null },
-    data: { leftAt: endedDate },
-  }).catch(() => {});
-
-  // Update space as ended
-  const updated = await prisma.space.update({
-    where: { id },
-    data: {
-      isLive: false,
-      endedAt: endedDate,
-    },
-    include: {
-      host: { select: HOST_SELECT },
-      network: { select: { id: true, name: true, slug: true, logoImage: true } },
-    },
-  });
 
   return NextResponse.json(updated);
 }

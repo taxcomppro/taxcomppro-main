@@ -1,4 +1,5 @@
 "use client";
+import { safeRichText } from "@/lib/safe-rich-text";
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
@@ -1276,7 +1277,7 @@ export default function NewsletterStudio({
                                 setBodyHtml(html);
                                 setPlainTextBody(htmlToPlainText(html));
                               }}
-                              dangerouslySetInnerHTML={{ __html: bodyHtml }}
+                              dangerouslySetInnerHTML={{ __html: safeRichText(bodyHtml) }}
                               className="w-full min-h-[260px] max-h-[420px] overflow-y-auto bg-white dark:bg-[#0c182c] border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 leading-relaxed font-sans shadow-inner"
                             />
                           </div>

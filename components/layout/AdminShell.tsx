@@ -50,6 +50,11 @@ const groups = [
         icon: UserGroupIcon,
       },
       {
+        label: "Pro Talks",
+        href: "/admin/pro-talks",
+        icon: Calendar03Icon,
+      },
+      {
         label: "Pro Networks",
         href: "/admin/content?tab=networks",
         icon: UserGroupIcon,
