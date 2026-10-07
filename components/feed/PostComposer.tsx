@@ -3,7 +3,7 @@ import { PRIVACY_REMINDER, detectSensitiveData } from "@/lib/specialists/catalog
 
 import { useState, useRef, useCallback } from "react";
 import { useAppSelector } from "@/store/hooks";
-import { Loading03Icon as Loader2, Cancel01Icon as X, Alert02Icon as AlertCircle, Calendar03Icon as Calendar, Clock01Icon as Clock, CrownIcon as Crown, Link01Icon } from "hugeicons-react";
+import { Loading03Icon as Loader2, Cancel01Icon as X, Alert02Icon as AlertCircle, Calendar03Icon as Calendar, Clock01Icon as Clock, CrownIcon as Crown } from "hugeicons-react";
 import { Image01Icon, SentIcon, Video02Icon } from "hugeicons-react";
 import type { FeedPost } from "@/components/feed/PostCard";
 import UpgradeModal from "@/components/ui/UpgradeModal";
@@ -18,6 +18,7 @@ const MAX_VIDEO_SECS = 30;
 // Returns a datetime-local string for the min attribute (5 min from now)
 function minDateTimeLocal() {
   const d = new Date(Date.now() + 5 * 60_000);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 16);
 }
 
@@ -32,11 +33,6 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
   const [video,      setVideo]      = useState<{ file: File; url: string; duration: number } | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [uploading,  setUploading]  = useState(false);
-
-  // Link state
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [linkUrl, setLinkUrl] = useState("");
-  const [linkText, setLinkText] = useState("");
 
   // Schedule state
   const [showScheduler, setShowScheduler] = useState(false);
@@ -77,11 +73,13 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
         setVideoError(`Video must be ${MAX_VIDEO_SECS} seconds or less (yours is ${Math.round(el.duration)}s).`);
         URL.revokeObjectURL(url);
       } else {
-        setPreviews([]);
+        previews.forEach(p => URL.revokeObjectURL(p.url)); setPreviews([]);
+        if (video) URL.revokeObjectURL(video.url);
         setVideo({ file, url, duration: Math.round(el.duration) });
       }
-      URL.revokeObjectURL(el.src);
+      el.removeAttribute("src");
     };
+    el.onerror = () => { URL.revokeObjectURL(url); setVideoError("This video could not be opened. Please try another file."); };
     el.src = url;
   };
 
@@ -93,43 +91,9 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
   };
 
   const reset = () => {
-    setExpanded(false); setContent(""); setPreviews([]); removeVideo();
+    setExpanded(false); setContent(""); previews.forEach(p => URL.revokeObjectURL(p.url)); setPreviews([]); removeVideo();
+    if (fileRef.current) fileRef.current.value = "";
     setShowScheduler(false); setScheduledAt(""); setScheduleError(null);
-    setShowLinkInput(false); setLinkUrl(""); setLinkText("");
-  };
-
-  const insertLink = () => {
-    let url = linkUrl.trim();
-    if (!url) return;
-    if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("/")) {
-      url = "https://" + url;
-    }
-    const text = linkText.trim();
-    const snippet = text ? `[${text}](${url})` : url;
-
-    if (textRef.current) {
-      const start = textRef.current.selectionStart ?? content.length;
-      const end = textRef.current.selectionEnd ?? content.length;
-      const before = content.slice(0, start);
-      const after = content.slice(end);
-      const spacerBefore = before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n") ? " " : "";
-      const spacerAfter = after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n") ? " " : "";
-      const newContent = `${before}${spacerBefore}${snippet}${spacerAfter}${after}`;
-      setContent(newContent);
-      setTimeout(() => {
-        if (textRef.current) {
-          textRef.current.focus();
-          const newPos = start + spacerBefore.length + snippet.length + spacerAfter.length;
-          textRef.current.setSelectionRange(newPos, newPos);
-        }
-      }, 50);
-    } else {
-      setContent(prev => (prev ? `${prev} ${snippet}` : snippet));
-    }
-
-    setLinkUrl("");
-    setLinkText("");
-    setShowLinkInput(false);
   };
 
   /* ── submit (immediate or scheduled) ── */
@@ -230,20 +194,22 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
         <div className="flex-1">
           {!expanded ? (
             <button
+              data-feed-compose-trigger
               onClick={() => { if (isFree) { setShowUpgrade(true); return; } setExpanded(true); setTimeout(() => textRef.current?.focus(), 50); }}
               className="w-full text-left text-slate-400 text-sm bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full px-5 py-3 transition-all">
-              Share an insight or update, {user?.name?.split(" ")[0]}…
+              {content.trim() || previews.length || video ? "Continue your draft…" : `Share something, ${user?.name?.split(" ")[0] ?? "there"}…`}
             </button>
           ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-slate-500 dark:text-slate-300 mb-2">{PRIVACY_REMINDER} Mention @Atlas or a specialist to invite an AI reply.</p>
+            <fieldset className="feed-compose-editor space-y-3" disabled={submitting}>
+              <div className="feed-compose-heading"><strong>Create a post</strong><span>Share with your community</span></div>
               <textarea
                 ref={textRef}
+                aria-label="Write a post"
                 value={content}
                 onChange={e => setContent(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) handleSubmit(); }}
-                placeholder="What's on your mind? Share a tax insight, update, or question…"
-                rows={4}
+                onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void handleSubmit(showScheduler); } }}
+                placeholder="Share an insight, ask a question, or start a conversation…"
+                rows={3}
                 className="w-full font-[inherit] text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 resize-none outline-none focus:border-[#0a1628] focus:ring-2 focus:ring-[#0a1628]/10 transition-all"
               />
 
@@ -253,8 +219,8 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                   {previews.map((p, i) => (
                     <div key={i} className="relative group rounded-xl overflow-hidden bg-slate-100 aspect-video">
                       <img src={p.url} alt="" className="w-full h-full object-cover" />
-                      <button onClick={() => removeImage(i)}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button aria-label={`Remove photo ${i + 1}`} onClick={() => removeImage(i)}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-100 transition-opacity">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -274,7 +240,7 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                     className="w-full max-h-64 object-contain"
                   />
                   <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{video.duration}s</div>
-                  <button onClick={removeVideo} className="absolute top-2 right-2 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white">
+                  <button aria-label="Remove video" onClick={removeVideo} className="absolute top-2 right-2 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -295,12 +261,13 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-blue-600 shrink-0" />
                     <span className="text-xs font-bold text-blue-800">Schedule for later</span>
-                    <button onClick={() => { setShowScheduler(false); setScheduledAt(""); setScheduleError(null); }}
+                    <button aria-label="Close scheduling" onClick={() => { setShowScheduler(false); setScheduledAt(""); setScheduleError(null); }}
                       className="ml-auto text-blue-400 hover:text-blue-600">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <input
+                    aria-label="Publish date and time"
                     type="datetime-local"
                     value={scheduledAt}
                     min={minDateTimeLocal()}
@@ -316,63 +283,9 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                 </div>
               )}
 
-              {/* Link inserter */}
-              {showLinkInput && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Link01Icon className="w-4 h-4 text-blue-600" />
-                      <span className="text-xs font-bold text-slate-800">Add Link to Post</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowLinkInput(false)}
-                      className="text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Link URL *</label>
-                      <input
-                        type="url"
-                        value={linkUrl}
-                        onChange={e => setLinkUrl(e.target.value)}
-                        placeholder="https://example.com"
-                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); insertLink(); } }}
-                        className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-slate-800 font-[inherit]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Display Text (Optional)</label>
-                      <input
-                        type="text"
-                        value={linkText}
-                        onChange={e => setLinkText(e.target.value)}
-                        placeholder="e.g. IRS Guidance, Form 8867"
-                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); insertLink(); } }}
-                        className="w-full text-xs bg-white border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500 text-slate-800 font-[inherit]"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] text-slate-400">Tip: You can also paste URLs directly into the post text!</span>
-                    <button
-                      type="button"
-                      onClick={insertLink}
-                      disabled={!linkUrl.trim()}
-                      className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg transition-colors disabled:opacity-40 cursor-pointer"
-                    >
-                      Insert Link
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Toolbar */}
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex gap-1">
+              <div className="feed-compose-toolbar">
+                <div className="feed-compose-tools" role="group" aria-label="Add to your post">
                   {/* Photo */}
                   <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
                     onChange={e => handleFiles(e.target.files)} />
@@ -394,23 +307,10 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                     Video
                   </button>
 
-                  {/* Link */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowLinkInput(prev => !prev);
-                      setShowScheduler(false);
-                    }}
-                    className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition-all ${showLinkInput ? "text-blue-700 bg-blue-50" : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"}`}>
-                    <Link01Icon className="w-4 h-4 text-blue-500" />
-                    Link
-                  </button>
-
                   {/* Schedule */}
                   <button
                     onClick={() => {
                       setShowScheduler(s => !s);
-                      setShowLinkInput(false);
                     }}
                     className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition-all ${showScheduler ? "text-blue-700 bg-blue-50" : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"}`}>
                     <Calendar className="w-4 h-4 text-blue-500" />
@@ -418,10 +318,10 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button onClick={reset}
+                <div className="feed-compose-submit">
+                  <button onClick={() => setExpanded(false)}
                     className="text-xs font-semibold text-slate-400 hover:text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-100 transition-all">
-                    Cancel
+                    Close
                   </button>
 
                   {/* Schedule submit */}
@@ -447,7 +347,7 @@ export default function PostComposer({ onPostCreated, onScheduled }: Props) {
                   )}
                 </div>
               </div>
-            </div>
+            </fieldset>
           )}
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight01Icon as ExternalLink, UserGroupIcon as Users, ShoppingBag01Icon as ShoppingBag, CheckmarkCircle02Icon as CheckCircle2, RefreshIcon as RefreshCw, News01Icon as Newspaper, ArrowRight01Icon as ChevronRight, Briefcase01Icon as Briefcase, StarIcon as Star, Radio01Icon as Radio, Mic01Icon as Mic, Calendar03Icon as Calendar } from "hugeicons-react";
+import { ArrowUpRight01Icon as ExternalLink, RefreshIcon as RefreshCw, News01Icon as Newspaper, ArrowRight01Icon as ChevronRight, Briefcase01Icon as Briefcase, StarIcon as Star, Radio01Icon as Radio, Mic01Icon as Mic, Calendar03Icon as Calendar } from "hugeicons-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,20 +30,10 @@ interface IrsItem {
   description: string; pubDate: string; irNumber: string;
 }
 
-interface Community {
-  id: string; name: string; description: string;
-  memberCount: number; slug: string; isMember: boolean;
-}
-
 interface Pro {
   profileSlug?: string | null;
   id: string; name: string; image: string | null;
   headline: string | null; specialties: string[];
-}
-
-interface Listing {
-  id: string; title: string; category: string;
-  price: number | null; user: { name: string };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -51,16 +41,6 @@ interface Listing {
 const BG = ["from-blue-600 to-blue-800", "from-amber-500 to-orange-600",
             "from-violet-600 to-purple-800", "from-emerald-500 to-teal-700",
             "from-rose-500 to-pink-700"];
-
-const catColors: Record<string, string> = {
-  SERVICE: "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300", 
-  PRODUCT: "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300",
-  NETWORK: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300", 
-  TRAINING: "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300",
-};
-const catLabels: Record<string, string> = {
-  SERVICE: "Service", PRODUCT: "Product", NETWORK: "Network", TRAINING: "Course",
-};
 
 function formatScheduledShort(d: string) {
   const date = new Date(d);
@@ -263,7 +243,7 @@ function IrsNewsSection() {
       .then(r => r.json())
       .then((d: IrsItem[]) => {
         const arr = Array.isArray(d) ? d : [];
-        setNews(arr.slice(0, 5));
+        setNews(arr.slice(0, 3));
         setStale(arr.length === 0);
       })
       .catch(() => setStale(true))
@@ -311,82 +291,6 @@ function IrsNewsSection() {
   );
 }
 
-// ── Communities ───────────────────────────────────────────────────────────────
-
-function CommunitiesSection() {
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [joinedMap, setJoinedMap]     = useState<Record<string, boolean>>({});
-  const [loading, setLoading]         = useState(true);
-
-  useEffect(() => {
-    fetch("/api/communities")
-      .then(r => r.json())
-      .then((c: Community[]) => {
-        const comms = Array.isArray(c) ? c.slice(0, 4) : [];
-        setCommunities(comms);
-        const init: Record<string, boolean> = {};
-        comms.forEach(x => { if (x.isMember) init[x.id] = true; });
-        setJoinedMap(init);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleJoin = async (id: string) => {
-    try {
-      const res = await fetch("/api/communities/join", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ communityId: id }),
-      });
-      if (res.ok || res.status === 409) setJoinedMap(p => ({ ...p, [id]: true }));
-    } catch { /* ignore */ }
-  };
-
-  if (!loading && communities.length === 0) return null;
-
-  return (
-    <Section title="Groups" icon={Users} href="/groups">
-      <div className="space-y-3">
-        {loading ? (
-          [1, 2, 3].map(i => (
-            <div key={i} className="flex items-center gap-3 animate-pulse">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-2/3" />
-                <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded w-1/3" />
-              </div>
-            </div>
-          ))
-        ) : (
-          communities.map((c, i) => (
-            <div key={c.id} className="flex items-center gap-2.5">
-              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${BG[i % 5]} flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm`}>
-                {c.name[0]?.toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-[#0a1628] dark:text-white truncate">{c.name}</div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <Users className="w-2.5 h-2.5" />{c.memberCount.toLocaleString()} members
-                </div>
-              </div>
-              {joinedMap[c.id] ? (
-                <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 shrink-0">
-                  <CheckCircle2 className="w-3 h-3" /> Joined
-                </span>
-              ) : (
-                <button onClick={() => handleJoin(c.id)}
-                  className="text-[10px] font-black text-[#0a1628] dark:text-white border border-[#0a1628]/30 dark:border-white/30 px-2.5 py-1 rounded-full hover:bg-[#0a1628] hover:text-white dark:hover:bg-white dark:hover:text-[#0a1628] transition-all shrink-0">
-                  + Join
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </Section>
-  );
-}
-
 // ── Top Professionals ─────────────────────────────────────────────────────────
 
 function TopProsSection() {
@@ -404,7 +308,7 @@ function TopProsSection() {
   if (!loading && pros.length === 0) return null;
 
   return (
-    <Section title="Top Tax Professionals" icon={Star} href="/find-a-pro" linkLabel="Find a Pro">
+    <Section title="People to discover" icon={Star} href="/find-a-pro" linkLabel="Find a Pro">
       <div className="space-y-3">
         {loading ? (
           [1, 2, 3].map(i => (
@@ -442,73 +346,14 @@ function TopProsSection() {
   );
 }
 
-// ── Marketplace ───────────────────────────────────────────────────────────────
-
-function MarketplaceSection() {
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading]   = useState(true);
-
-  useEffect(() => {
-    fetch("/api/marketplace")
-      .then(r => r.json())
-      .then((d: Listing[]) => setListings(Array.isArray(d) ? d.slice(0, 4) : []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (!loading && listings.length === 0) return null;
-
-  return (
-    <Section title="Marketplace" icon={ShoppingBag} href="/marketplace">
-      <div className="space-y-3">
-        {loading ? (
-          [1, 2, 3].map(i => (
-            <div key={i} className="flex items-start gap-2.5 animate-pulse">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0" />
-              <div className="flex-1 space-y-1.5 pt-0.5">
-                <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-full" />
-                <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded w-2/3" />
-              </div>
-            </div>
-          ))
-        ) : (
-          listings.map(l => (
-            <Link key={l.id} href={`/marketplace`}
-              className="flex items-start gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex items-center justify-center shrink-0">
-                <ShoppingBag className="w-4 h-4 text-slate-400 dark:text-slate-400 group-hover:text-amber-500 transition-colors" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-[#0a1628] dark:text-white line-clamp-2 leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                  {l.title}
-                </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${catColors[l.category] ?? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
-                    {catLabels[l.category] ?? l.category}
-                  </span>
-                  <span className="text-[10px] font-black text-[#0a1628] dark:text-amber-400">
-                    {l.price != null ? `$${l.price}` : "Free"}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))
-        )}
-      </div>
-    </Section>
-  );
-}
-
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function FeedRightPanel() {
   return (
     <aside className="w-full space-y-3">
+      <TopProsSection />
       <LiveProTalksSection />
       <IrsNewsSection />
-      <TopProsSection />
-      <CommunitiesSection />
-      <MarketplaceSection />
 
       {/* Footer */}
       <div className="px-2 pb-2">

@@ -1,4 +1,5 @@
 import "./feed.css";
+import "./social-feed.css";
 
 function Line({ short = false }: { short?: boolean }) {
   return <span className={`feed-skeleton-block feed-skeleton-line ${short ? "feed-skeleton-short" : ""}`} />;

@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+
 import FirstPostCelebration from "@/components/feed/FirstPostCelebration";
 import PostComposer from "@/components/feed/PostComposer";
 import PostCard, { type FeedPost } from "@/components/feed/PostCard";
@@ -12,6 +13,7 @@ import { PostSkeleton, LeftPanelSkeleton, ComposerSkeleton } from "@/components/
 import { RefreshIcon as RefreshCw, ComputerVideoIcon as MonitorPlay, ArrowUpRight01Icon as ExternalLink, SparklesIcon as Sparkles, Cancel01Icon as X } from "hugeicons-react";
 import Link from "next/link";
 import "@/components/feed/feed.css";
+import "@/components/feed/social-feed.css";
 import { NoteEditIcon } from "hugeicons-react";
 import { useAppSelector, useAppDispatch } from "@/store/hooks";
 import { setUser } from "@/store/slices/authSlice";
@@ -244,14 +246,15 @@ function FeedContent() {
           </div>
         )}
 
-            <header className="feed-heading"><div><p>Your professional community</p><h1>{sharedPost ? "Shared post" : "Your feed"}<span>.</span></h1></div><button type="button" onClick={refreshFeed} disabled={loading} aria-label="Refresh feed"><RefreshCw size={19} /></button></header>
-            <nav className="feed-quick-links" aria-label="Explore your community">{sharedPost && <Link href="/feed">Back to your feed</Link>}<Link href="/groups">Groups</Link><Link href="/pro-networks">Pro Network</Link><Link href="/find-a-pro">Find a Pro</Link></nav>
+            {sharedPost && <Link className="feed-back" href="/feed">← Back to your feed</Link>}
+            <nav className="feed-mobile-links" aria-label="Community shortcuts"><Link href="/connections">Connections</Link><Link href="/pro-networks">Pro Networks</Link><Link href="/pro-talks">Pro Talks</Link><Link href="/find-a-pro">Find a Pro</Link></nav>
             {!user && loading && <ComposerSkeleton />}
             {/* Post Composer starts showing immediately at top for logged-in users */}
             {user && <PostComposer onPostCreated={handlePostCreated} onScheduled={() => setScheduleRefreshKey(k => k + 1)} />}
             {!sharedPost && <nav className="feed-filter-tabs" aria-label="Filter feed posts">
-              {([["all", "All posts"], ["connections", "Connections"], ["following", "Following"]] as const).map(([value,label]) =>
+              {([["all", "Discover"], ["connections", "Connections"], ["following", "Following"]] as const).map(([value,label]) =>
                 <Link key={value} href={value === "all" ? "/feed" : `/feed?filter=${value}`} aria-current={feedFilter === value ? "page" : undefined}>{label}</Link>)}
+              <button type="button" className="feed-refresh" onClick={refreshFeed} disabled={loading} aria-label="Refresh feed"><RefreshCw size={18} /></button>
             </nav>}
 
             {/* Scheduled posts snippet — only for logged-in users */}

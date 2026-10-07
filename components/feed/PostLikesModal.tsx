@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { REACTIONS } from "@/lib/reactions";
+import ReactionIcon from "./ReactionIcon";
+import { REACTIONS, isReaction } from "@/lib/reactions";
 import { Cancel01Icon as X, Loading03Icon as Loader2, Search01Icon as Search } from "hugeicons-react";
 import { ThumbsUpIcon } from "hugeicons-react";
 import DueDiligenceBadge from "@/components/badges/DueDiligenceBadge";
@@ -200,7 +201,7 @@ export default function PostLikesModal({ postId, isOpen, onClose, initialCount }
                       </div>
                       {/* Thumbs up badge attached to avatar corner */}
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center border-2 border-white shadow-xs">
-                        <span aria-label={REACTIONS.find(item => item.type === reaction)?.label ?? "Like"}>{REACTIONS.find(item => item.type === reaction)?.emoji ?? "👍"}</span>
+                        <span aria-label={REACTIONS.find(item => item.type === reaction)?.label ?? "Like"}><ReactionIcon type={isReaction(reaction) ? reaction : "LIKE"} active size={22} /></span>
                       </span>
                     </div>
 

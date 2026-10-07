@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ThumbsUpIcon, Comment01Icon, Share01Icon, Cancel01Icon, Copy01Icon, ArrowDown01Icon, Link01Icon, RepeatIcon } from "hugeicons-react";
+import { Cancel01Icon, ArrowDown01Icon, RepeatIcon } from "hugeicons-react";
 import Link from "next/link";
+import FeedIcon from "./FeedIcon";
+import ReactionIcon from "./ReactionIcon";
 import { REACTIONS, isReaction, type ReactionType, type ReactionCounts } from "@/lib/reactions";
 
 export default function PostActions({ postId, content, initialReaction, initialCounts, initialCount, commentCount, canReact, onRequireUpgrade, onComments, onShowReactions, onCountChange, privateGroup = false, repostSourceId, viewerRepostId, repostCount = 0, canRepost = false, signedIn = false, onRepost }: {
@@ -38,8 +40,8 @@ export default function PostActions({ postId, content, initialReaction, initialC
     } catch (e) { setShareStatus(e instanceof Error ? e.message : "Couldn’t repost. Please try again."); }
     finally { repostPending.current = false; setReposting(false); }
   }
-  const [shareUrl, setShareUrl] = useState("");
-  const [nativeShare, setNativeShare] = useState(false);
+
+
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [people, setPeople] = useState<{ id: string; reaction?: string; user: { name: string } }[]>([]);
   const [peopleLoading, setPeopleLoading] = useState(false);
@@ -50,7 +52,7 @@ export default function PostActions({ postId, content, initialReaction, initialC
   const pending = useRef(false);
   const picker = useRef<HTMLDetailsElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
-  const linkInput = useRef<HTMLInputElement>(null);
+
   const total = Object.values(counts).reduce((sum, count) => sum + (count ?? 0), 0);
   const selected = REACTIONS.find(item => item.type === reaction);
   const top = REACTIONS.filter(item => (counts[item.type] ?? 0) > 0).sort((a,b) => (counts[b.type] ?? 0) - (counts[a.type] ?? 0));
@@ -101,29 +103,16 @@ export default function PostActions({ postId, content, initialReaction, initialC
     } catch { setError("Your reaction wasn’t saved. Please try again."); }
     finally { pending.current = false; setBusy(false); }
   };
-  const openShare = () => {
-    setShareUrl(`${window.location.origin}/feed?post=${encodeURIComponent(postId)}`);
-    setNativeShare(typeof navigator.share === "function");
-    setShareStatus(""); setShareOpen(true);
-  };
-  const copyLink = async () => {
-    try { await navigator.clipboard.writeText(shareUrl); setShareStatus("Link copied."); }
-    catch { linkInput.current?.focus(); linkInput.current?.select(); setShareStatus("Select and copy the link above."); }
-  };
-  const share = async () => {
-    try { await navigator.share({ title: "Post on Tax Compliance Pro", url: shareUrl, ...(privateGroup ? {} : { text: content.slice(0,160) }) }); setShareOpen(false); }
-    catch (error) { if (!(error instanceof Error && error.name === "AbortError")) setShareStatus("Sharing isn’t available right now. You can copy the link instead."); }
-  };
-
+  const openShare = () => { setShareStatus(""); setShareOpen(true); };
   return <>
     {(total > 0 || commentCount > 0 || reposts > 0) && <div className="feed-reaction-stats">
       {total > 0 && <div className="feed-people-hover" onMouseEnter={showPeople} onMouseLeave={() => setPeopleOpen(false)} onFocus={showPeople} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPeopleOpen(false); }} onKeyDown={event => { if (event.key === "Escape") setPeopleOpen(false); }}>
         <button type="button" className="feed-reaction-summary" onClick={onShowReactions} aria-describedby={peopleOpen ? `reaction-people-${postId}` : undefined} aria-label={`${total} reactions. View who reacted.`}>
-          {top.slice(0,3).map(item => <span key={item.type} aria-hidden="true">{item.emoji}</span>)}<strong>{total}</strong>
+          {top.slice(0,3).map(item => <span key={item.type} aria-hidden="true"><ReactionIcon type={item.type} active size={20} /></span>)}<strong>{total}</strong>
         </button>
         {peopleOpen && <div className="feed-people-tooltip" id={`reaction-people-${postId}`} role="tooltip">
           <h3>People who reacted</h3>
-          {peopleLoading ? <p>Loading reactions…</p> : peopleError ? <p>Couldn’t load names. Click to try the full list.</p> : <><ul>{people.map(person => <li key={person.id}><span aria-label={REACTIONS.find(item => item.type === person.reaction)?.label ?? "Like"}>{REACTIONS.find(item => item.type === person.reaction)?.emoji ?? "👍"}</span>{person.user.name}</li>)}</ul>{total > people.length && <p>And {total - people.length} more · click to view all</p>}</>}
+          {peopleLoading ? <p>Loading reactions…</p> : peopleError ? <p>Couldn’t load names. Click to try the full list.</p> : <><ul>{people.map(person => <li key={person.id}><span aria-label={REACTIONS.find(item => item.type === person.reaction)?.label ?? "Like"}><ReactionIcon type={isReaction(person.reaction) ? person.reaction : "LIKE"} active size={20} /></span>{person.user.name}</li>)}</ul>{total > people.length && <p>And {total - people.length} more · click to view all</p>}</>}
         </div>}
       </div>}
       {commentCount > 0 && <button type="button" className="feed-comment-total" onClick={onComments}>{commentCount} comment{commentCount === 1 ? "" : "s"}</button>}
@@ -132,31 +121,32 @@ export default function PostActions({ postId, content, initialReaction, initialC
     <div className="feed-social-bar">
       <div className="feed-social-actions">
         <div className="feed-reaction-control" onMouseEnter={openPicker} onMouseLeave={closePicker}>
-          <button type="button" onClick={() => react(reaction ?? "LIKE")} disabled={busy} aria-pressed={!!reaction} aria-label={selected ? `Remove ${selected.label} reaction` : "Like post"} className={reaction ? "is-reacted" : ""}>{selected ? <span className="feed-reaction-emoji" aria-hidden="true">{selected.emoji}</span> : <ThumbsUpIcon size={21} />}<span>{selected?.label ?? "Like"}</span></button>
+          <button type="button" onClick={() => react(reaction ?? "LIKE")} disabled={busy} aria-pressed={!!reaction} aria-label={selected ? `Remove ${selected.label} reaction` : "Like post"} className={reaction ? "is-reacted" : ""}><ReactionIcon type={reaction ?? "LIKE"} active={!!reaction} size={23} /><span>{selected?.label ?? "Like"}</span></button>
           <details ref={picker} className="feed-reaction-picker" onKeyDown={event => { if (event.key === "Escape" && picker.current) picker.current.open = false; }}>
             <summary aria-label="Choose a reaction"><ArrowDown01Icon size={14} /></summary>
-            <div className="feed-reaction-options" role="group" aria-label="Post reactions">{REACTIONS.map(item => <button key={item.type} type="button" title={item.label} aria-label={item.label} aria-pressed={reaction === item.type} disabled={busy} onClick={() => react(item.type)}><span aria-hidden="true">{item.emoji}</span><small>{item.label}</small></button>)}</div>
+            <div className="feed-reaction-options" role="group" aria-label="Post reactions">{REACTIONS.map(item => <button key={item.type} type="button" title={item.label} aria-label={item.label} aria-pressed={reaction === item.type} disabled={busy} onClick={() => react(item.type)}><span aria-hidden="true"><ReactionIcon type={item.type} active={reaction === item.type} size={28} /></span><small>{item.label}</small></button>)}</div>
           </details>
         </div>
-        <button type="button" onClick={onComments} aria-label={`${commentCount} comments`}><Comment01Icon size={21} /><span>Comment</span></button>
-        <button type="button" onClick={openShare} aria-label="Share post"><Share01Icon size={21} /><span>Share</span></button>
+        <button type="button" onClick={onComments} aria-label={`${commentCount} comments`}><FeedIcon name="message" size={23} /><span>Comment</span></button>
+        {(canRepost || myRepostId) && !privateGroup && <button type="button" onClick={openShare} aria-label={myRepostId ? "Manage repost" : "Repost post"} aria-pressed={!!myRepostId}><RepeatIcon size={23} /><span>{myRepostId ? "Reposted" : "Repost"}</span></button>}
       </div>
     </div>
     {error && <p className="feed-action-error" role="alert">{error}</p>}
-    {shareOpen && <dialog ref={dialog} className="feed-share-dialog" onCancel={() => setShareOpen(false)} onClick={event => { if (event.target === event.currentTarget) setShareOpen(false); }}>
-      <div className="feed-share-content"><header><h2>Share this post</h2><button type="button" aria-label="Close sharing" onClick={() => setShareOpen(false)}><Cancel01Icon size={22} /></button></header>
-      <p>{privateGroup ? "This post is in a private group. Only group members can open it." : "Send this conversation to someone who would find it useful."}</p>
-      {(canRepost || myRepostId) && <section className="feed-repost-compose" aria-label="Repost to your feed">
-        <h3><RepeatIcon size={19} aria-hidden />Repost to your feed</h3>
-        {signedIn ? <>
-          {!myRepostId && <><label htmlFor={`repost-caption-${postId}`}>Add your thoughts (optional)</label><textarea id={`repost-caption-${postId}`} maxLength={3000} rows={3} value={repostText} onChange={e => setRepostText(e.target.value)} placeholder="What would you like to add?" /></>}
-          <button type="button" disabled={reposting} onClick={repost}>{reposting ? "Saving…" : myRepostId ? "Remove my repost" : "Repost now"}</button>
-          {myRepostId && <Link href={`/feed?post=${myRepostId}`} onClick={() => setShareOpen(false)}>View your repost</Link>}
-        </> : <Link href={`/login?redirect=${encodeURIComponent(`/feed?post=${postId}`)}`}>Sign in to repost</Link>}
-      </section>}
-      <label htmlFor={`share-link-${postId}`}>Post link</label><div className="feed-share-link"><Link01Icon size={18} /><input ref={linkInput} id={`share-link-${postId}`} readOnly value={shareUrl} onFocus={event => event.target.select()} /></div>
-      <div className="feed-share-buttons"><button type="button" onClick={copyLink}><Copy01Icon size={18} />Copy link</button>{nativeShare && <button type="button" onClick={share}><Share01Icon size={18} />More ways to share</button>}</div>
-      <p role="status">{shareStatus}</p></div>
+    {shareOpen && <dialog ref={dialog} className="feed-share-dialog feed-repost-dialog" aria-labelledby={`repost-title-${postId}`} onCancel={() => setShareOpen(false)} onClick={event => { if (event.target === event.currentTarget) setShareOpen(false); }}>
+      <div className="feed-share-content">
+        <header><h2 id={`repost-title-${postId}`}>{myRepostId ? "Your repost" : "Repost to your feed"}</h2><button type="button" aria-label="Close repost dialog" onClick={() => setShareOpen(false)}><Cancel01Icon size={22} /></button></header>
+        <p className="feed-repost-intro">{myRepostId ? "This conversation is on your feed." : "Bring this conversation to your community."}</p>
+        <section className="feed-repost-compose" aria-label="Repost options">
+          {signedIn ? <>
+            {!myRepostId && <><label htmlFor={`repost-caption-${postId}`}>Add your thoughts <span>(optional)</span></label><textarea autoFocus disabled={reposting} id={`repost-caption-${postId}`} maxLength={3000} rows={3} value={repostText} onChange={e => setRepostText(e.target.value)} placeholder="What would you like to add?" /><small className="feed-repost-counter">{repostText.length.toLocaleString()} / 3,000</small></>}
+            <blockquote className="feed-repost-preview"><span>Original post</span><p>{content ? content.slice(0, 240) + (content.length > 240 ? "…" : "") : "A media post from your community"}</p></blockquote>
+            {shareStatus && <p role="status" className="feed-repost-status">{shareStatus}</p>}
+            <div className="feed-repost-footer"><button type="button" className="feed-repost-cancel" onClick={() => setShareOpen(false)}>Close</button><button type="button" disabled={reposting} onClick={repost}><RepeatIcon size={18} />{reposting ? "Saving…" : myRepostId ? "Remove repost" : "Repost"}</button></div>
+            {myRepostId && <Link href={`/feed?post=${myRepostId}`} onClick={() => setShareOpen(false)}>View your repost →</Link>}
+          </> : <Link href={`/login?redirect=${encodeURIComponent(`/feed?post=${postId}`)}`}>Sign in to repost</Link>}
+        </section>
+      </div>
     </dialog>}
+
   </>;
 }
