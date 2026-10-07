@@ -3,8 +3,11 @@ export function hasPhoneNumber(value: unknown): boolean {
 }
 
 export function normalizePhoneNumber(value: unknown): string | null {
-  if (typeof value !== "string" || value.length > 40 || !/^\+[\d\s().-]+$/.test(value.trim())) return null;
+  if (typeof value !== "string" || value.length > 40 || !/^\+?[\d\s().-]+$/.test(value.trim())) return null;
   const normalized = value.trim().replace(/[\s().-]/g, "");
+  // Member numbers without a country prefix default to the US/Canada calling code.
+  if (/^\d{10}$/.test(normalized)) return `+1${normalized}`;
+  if (/^1\d{10}$/.test(normalized)) return `+${normalized}`;
   return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : null;
 }
 

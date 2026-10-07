@@ -13,7 +13,7 @@ export default function PhoneCapture({ returnTo = "/feed" }: { returnTo?: string
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (saving) return;
     const normalized = normalizePhoneNumber(phone);
-    if (!normalized) { setError("Include your country code, for example +1 555 123 4567."); return; }
+    if (!normalized) { setError("Enter a valid 10-digit phone number, including your area code."); return; }
     setSaving(true); setError("");
     try {
       const response = await fetch("/api/user/phone", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: normalized }) });
@@ -35,8 +35,8 @@ export default function PhoneCapture({ returnTo = "/feed" }: { returnTo?: string
     <p className="phone-setup-copy">Phone numbers are now required for member accounts. Add yours once to continue where you left off.</p>
     <form onSubmit={submit}>
       <label htmlFor="required-phone">Phone number <span>(required)</span></label>
-      <input id="required-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="+1 555 123 4567" maxLength={40} required disabled={saving || leaving} aria-invalid={!!error} aria-describedby={error ? "phone-help phone-error" : "phone-help"} />
-      <p id="phone-help" className="phone-setup-help">Include your country code, such as +1 or +44.</p>
+      <input id="required-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="(555) 123-4567" maxLength={40} required disabled={saving || leaving} aria-invalid={!!error} aria-describedby={error ? "phone-help phone-error" : "phone-help"} />
+      <p id="phone-help" className="phone-setup-help">Enter your 10-digit number, including area code.</p>
       {error && <p id="phone-error" role="alert" className="phone-setup-error">{error}</p>}
       <button className="phone-setup-submit" type="submit" disabled={saving || leaving}>{saving ? "Saving your number…" : "Save and continue"}</button>
     </form>
