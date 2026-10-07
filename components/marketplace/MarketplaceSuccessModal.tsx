@@ -3,43 +3,44 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { clearMarketplaceCart } from "@/lib/marketplace-cart";
-import { CheckCircle2, Sparkles, X, ArrowRight, Loader2, Download } from "lucide-react";
+import { CheckCircle2, Sparkles, X, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export function MarketplaceSuccessModal() {
   const searchParams = useSearchParams();
-  const [isOpen, setIsOpen] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const sessionId = searchParams.get("session_id");
+  const stripeAccount = searchParams.get("stripe_account");
+  const isSuccess = searchParams.get("checkout_success") === "true" || searchParams.get("success") === "true";
+  const [dismissedSession, setDismissedSession] = useState<string | null>(null);
+  const [result, setResult] = useState<{ sessionId: string; error: string | null } | null>(null);
+  const isOpen = isSuccess && !!sessionId && dismissedSession !== sessionId;
+  const verifying = result?.sessionId !== sessionId;
+  const error = result?.sessionId === sessionId ? result.error : null;
 
   useEffect(() => {
-    const isSuccess = searchParams.get("checkout_success") === "true" || searchParams.get("success") === "true";
-    const sessionId = searchParams.get("session_id");
 
-    if (isSuccess) {
-      clearMarketplaceCart();
-      setIsOpen(true);
-
-      if (sessionId) {
-        setVerifying(true);
-        fetch("/api/stripe/verify-session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId }),
-        })
-          .catch((err) => console.error("Error verifying marketplace checkout session:", err))
-          .finally(() => setVerifying(false));
-      }
-    }
-  }, [searchParams]);
+    if (!isSuccess || !sessionId) return;
+    let cancelled = false;
+    fetch("/api/stripe/verify-session", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, stripeAccount: stripeAccount || undefined }),
+    }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to verify payment. Please reload to retry.");
+      if (!cancelled) { clearMarketplaceCart(); setResult({ sessionId, error: null }); }
+    }).catch(error => { if (!cancelled) setResult({ sessionId, error: error.message }); });
+    return () => { cancelled = true; };
+  }, [isSuccess, sessionId, stripeAccount]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    setIsOpen(false);
+    setDismissedSession(sessionId);
     const url = new URL(window.location.href);
     url.searchParams.delete("checkout_success");
     url.searchParams.delete("success");
     url.searchParams.delete("session_id");
+    url.searchParams.delete("stripe_account");
     window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
   };
 
@@ -68,12 +69,12 @@ export function MarketplaceSuccessModal() {
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#ffbe24]/10 border border-[#ffbe24]/20 text-[#ffbe24] text-[11px] font-extrabold uppercase tracking-wider mb-3">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Payment Successful</span>
+          <span>{verifying ? "Confirming payment" : error ? "Confirmation pending" : "Payment successful"}</span>
         </div>
 
-        <h3 className="text-xl font-bold text-white mb-2">Item Unlocked &amp; Ready!</h3>
+        <h3 className="text-xl font-bold text-white mb-2">{verifying ? "Checking your receipt" : error ? "Payment needs verification" : "Item unlocked and ready!"}</h3>
         <p className="text-xs text-slate-400 leading-relaxed mb-6">
-          Your purchase has been confirmed. You now have full access to download workpapers, contact the specialist, or view the complete listing.
+          {verifying ? "Please wait while we confirm your payment with Stripe." : error || "Your purchase is confirmed. You can now access your listing from My Purchases."}
         </p>
 
         {verifying && (

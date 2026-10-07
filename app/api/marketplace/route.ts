@@ -1,3 +1,5 @@
+import Stripe from "stripe";
+import { requireDirectChargeAccount } from "@/lib/stripe-direct-connect";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -51,15 +53,15 @@ export async function POST(req: NextRequest) {
 
   // Paid listings require Stripe Connect onboarding to receive payouts
   const priceNum = body.price !== undefined && body.price !== null ? Number(body.price) : 0;
-  const isPaid = !isNaN(priceNum) && priceNum > 0;
-  if (isPaid && !isAdmin && (!user?.stripeAccountId || !user?.stripeOnboarded)) {
-    return NextResponse.json(
-      {
-        error: "Stripe payout setup required. Please connect your Stripe account in the Seller Dashboard before creating paid listings.",
-        code: "STRIPE_SETUP_REQUIRED",
-      },
-      { status: 403 }
-    );
+  if (!Number.isFinite(priceNum) || priceNum < 0) return NextResponse.json({ error: "Enter a valid price of $0 or more." }, { status: 400 });
+  const isPaid = priceNum > 0;
+  if (isPaid) {
+    try {
+      if (!process.env.STRIPE_SECRET_KEY) throw new Error("Payment setup is temporarily unavailable. Your draft can be saved and published later.");
+      await requireDirectChargeAccount(new Stripe(process.env.STRIPE_SECRET_KEY), user?.stripeAccountId);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Connect Stripe before publishing a paid listing.", code: "STRIPE_SETUP_REQUIRED" }, { status: 409 });
+    }
   }
 
   // Generate URL-safe slug from title

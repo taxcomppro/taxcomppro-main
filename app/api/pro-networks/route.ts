@@ -1,3 +1,5 @@
+import Stripe from "stripe";
+import { requireDirectChargeAccount } from "@/lib/stripe-direct-connect";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { networkAccessWhere } from "@/lib/networkAccess";
@@ -203,16 +205,13 @@ export async function POST(req: NextRequest) {
       where: { id: session.user.id },
       select: { id: true, role: true, stripeAccountId: true, stripeOnboarded: true },
     });
-    const isAdmin = user?.role === "ADMIN";
-
-    if (price > 0 && !isAdmin && (!user?.stripeAccountId || !user?.stripeOnboarded)) {
-      return NextResponse.json(
-        {
-          error: "Stripe payout setup required. Please connect your Stripe account in the Seller Dashboard before creating a paid Pro Network.",
-          code: "STRIPE_SETUP_REQUIRED",
-        },
-        { status: 403 }
-      );
+    if (price > 0) {
+      try {
+        if (!process.env.STRIPE_SECRET_KEY) throw new Error("Payment setup is temporarily unavailable. Your draft can be saved and published later.");
+        await requireDirectChargeAccount(new Stripe(process.env.STRIPE_SECRET_KEY), user?.stripeAccountId);
+      } catch (error) {
+        return NextResponse.json({ error: error instanceof Error ? error.message : "Connect Stripe before publishing a paid network.", code: "STRIPE_SETUP_REQUIRED" }, { status: 409 });
+      }
     }
 
     // Create the Pro Network and automatically add owner as first member

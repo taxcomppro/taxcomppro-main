@@ -40,8 +40,7 @@ export default function NetworkSkeleton() {
       {/* ── LEFT DARK SIDEBAR SKELETON ── */}
       <aside className="pn-v2-sidebar" aria-hidden="true">
         <div>
-          {/* Back button placeholder */}
-          <span className="np-shimmer h-9 w-full rounded-xl mb-4" />
+
 
           {/* User Profile Card placeholder */}
           <div className="flex items-center gap-3 p-2 rounded-2xl bg-white/5 border border-white/10 mb-6">
@@ -55,7 +54,7 @@ export default function NetworkSkeleton() {
           {/* Nav Items */}
           <div className="space-y-1.5">
             <span className="np-shimmer h-3 w-20 rounded-md mb-3 ml-2 opacity-50" />
-            {Array.from({ length: 8 }, (_, i) => (
+            {Array.from({ length: 9 }, (_, i) => (
               <div
                 key={i}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.02]"
@@ -64,23 +63,6 @@ export default function NetworkSkeleton() {
                 <span
                   className="np-shimmer h-3.5 rounded-md"
                   style={{ width: `${60 + (i % 3) * 20}%` }}
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Tools Section */}
-          <div className="space-y-1.5 mt-6 pt-4 border-t border-white/5">
-            <span className="np-shimmer h-3 w-24 rounded-md mb-3 ml-2 opacity-50" />
-            {Array.from({ length: 4 }, (_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02]"
-              >
-                <span className="np-shimmer w-4 h-4 rounded-md shrink-0 opacity-60" />
-                <span
-                  className="np-shimmer h-3 rounded-md"
-                  style={{ width: `${50 + (i % 2) * 25}%` }}
                 />
               </div>
             ))}
@@ -94,9 +76,9 @@ export default function NetworkSkeleton() {
       </aside>
 
       {/* ── MAIN CONTENT AREA SKELETON ── */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen bg-[#08101e]" aria-hidden="true">
+      <div className="pn-v2-main-content flex-1 flex flex-col min-w-0 min-h-screen" aria-hidden="true">
         {/* Header Bar */}
-        <header className="relative min-h-[140px] px-6 py-5 flex items-center justify-between gap-4 border-b border-white/10 bg-[#08101e] overflow-hidden">
+        <header className="pn-v2-skeleton-header relative min-h-[125px] sm:min-h-[145px] px-6 py-5 flex items-center justify-between gap-4 border-b border-white/10 overflow-hidden">
           <div className="flex items-center gap-3 z-10">
             <span className="np-shimmer h-8 w-24 rounded-xl" />
             <span className="np-shimmer w-14 h-14 rounded-2xl shrink-0 ring-2 ring-white/10" />
@@ -150,8 +132,16 @@ export default function NetworkSkeleton() {
                   <span className="np-shimmer h-3.5 w-40 rounded-md" />
                   <span className="np-shimmer h-8 w-32 rounded-xl" />
                 </div>
-                <NetworkPostSkeleton />
-                <NetworkPostSkeleton />
+                {Array.from({ length: 4 }, (_, i) => (
+                  <div key={i} className="flex items-center gap-3 py-3 border-b border-white/5">
+                    <span className="np-shimmer w-8 h-8 rounded-full shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <span className="np-shimmer h-3.5 rounded-md" style={{ width: i % 2 ? "85%" : "65%" }} />
+                      <span className="np-shimmer h-2.5 w-48 rounded-md" />
+                    </div>
+                  </div>
+                ))}
+                <span className="np-shimmer h-3 w-32 rounded-md mx-auto" />
               </div>
             </div>
 

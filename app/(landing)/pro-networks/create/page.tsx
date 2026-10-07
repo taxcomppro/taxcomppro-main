@@ -1,6 +1,10 @@
 "use client";
+import SellerPaymentSetup, { CreationDraftNotice, sellerPublishLabel } from "@/components/seller/SellerPaymentSetup";
+import { useCreationDraft } from "@/lib/use-creation-draft";
+import { useSellerSetup } from "@/lib/use-seller-setup";
 
-import React, { useState, useEffect } from "react";
+
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
@@ -91,58 +95,8 @@ export default function CreateProNetworkPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Stripe Setup & Onboarding State
-  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; onboarded: boolean } | null>(null);
-  const [checkingStripe, setCheckingStripe] = useState(false);
-  const [connectingStripe, setConnectingStripe] = useState(false);
-  const [stripeError, setStripeError] = useState("");
-  const [stripeJustConnected, setStripeJustConnected] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("stripe=success")) {
-      setStripeJustConnected(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (session?.user) {
-      setCheckingStripe(true);
-      fetch("/api/seller/stripe-connect")
-        .then((r) => r.json())
-        .then((data) => {
-          if (data && typeof data.onboarded === "boolean") {
-            setStripeStatus({ connected: !!data.connected, onboarded: !!data.onboarded });
-          }
-        })
-        .catch((err) => console.warn("Failed to check Stripe status:", err))
-        .finally(() => setCheckingStripe(false));
-    }
-  }, [session?.user]);
-
-  const isAdmin = (session?.user as any)?.role === "ADMIN";
-  const isStripeReady = isAdmin || !!(stripeStatus?.connected && stripeStatus?.onboarded);
-
-  const handleConnectStripe = async () => {
-    setConnectingStripe(true);
-    setStripeError("");
-    try {
-      const res = await fetch("/api/seller/stripe-connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returnUrl: "/pro-networks/create" }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        window.location.href = data.url;
-      } else {
-        setStripeError(data?.error || "Failed to start Stripe onboarding. Please try again.");
-      }
-    } catch (err: any) {
-      setStripeError(err?.message || "Network error. Please try again.");
-    } finally {
-      setConnectingStripe(false);
-    }
-  };
+  const paymentSetup = useSellerSetup(session?.user?.id);
+  const isStripeReady = paymentSetup.ready;
 
   // Form State
   const [name, setName] = useState("");
@@ -186,6 +140,36 @@ export default function CreateProNetworkPage() {
   const [allowConsultations, setAllowConsultations] = useState(true);
   const [consultationUrl, setConsultationUrl] = useState("");
 
+
+  const draft = useCreationDraft("network", session?.user?.id, { name, tagline, description, category, monthlyPrice, coverImage, customCoverUrl, logoImage, accentColor, newBenefit, welcomeMessage, rules, directTextPhone, consultationUrl, allowDirectMessage, allowDirectText, allowQuestions, allowConsultations, benefits, step, pricingType, badge }, value => {
+    if (typeof value.name === "string") setName(value.name);
+    if (typeof value.tagline === "string") setTagline(value.tagline);
+    if (typeof value.description === "string") setDescription(value.description);
+    if (typeof value.category === "string") setCategory(value.category);
+    if (typeof value.monthlyPrice === "string") setMonthlyPrice(value.monthlyPrice);
+    if (typeof value.coverImage === "string") setCoverImage(value.coverImage);
+    if (typeof value.customCoverUrl === "string") setCustomCoverUrl(value.customCoverUrl);
+    if (typeof value.logoImage === "string") setLogoImage(value.logoImage);
+    if (typeof value.accentColor === "string") setAccentColor(value.accentColor);
+    if (typeof value.newBenefit === "string") setNewBenefit(value.newBenefit);
+    if (typeof value.welcomeMessage === "string") setWelcomeMessage(value.welcomeMessage);
+    if (typeof value.rules === "string") setRules(value.rules);
+    if (typeof value.directTextPhone === "string") setDirectTextPhone(value.directTextPhone);
+    if (typeof value.consultationUrl === "string") setConsultationUrl(value.consultationUrl);
+    if (typeof value.allowDirectMessage === "boolean") setAllowDirectMessage(value.allowDirectMessage);
+    if (typeof value.allowDirectText === "boolean") setAllowDirectText(value.allowDirectText);
+    if (typeof value.allowQuestions === "boolean") setAllowQuestions(value.allowQuestions);
+    if (typeof value.allowConsultations === "boolean") setAllowConsultations(value.allowConsultations);
+    if (Array.isArray(value.benefits)) setBenefits(value.benefits);
+    if ([1, 2, 3, 4, 5].includes(value.step)) setStep(value.step);
+    if (value.pricingType === "free" || value.pricingType === "paid") setPricingType(value.pricingType);
+    if (value.badge && typeof value.badge === "object") setBadge(value.badge);
+  });
+  const handleConnectStripe = async () => {
+    
+    await paymentSetup.connect("/pro-networks/create", () => draft.save());
+  };
+
   const handleAddBenefit = () => {
     if (!newBenefit.trim()) return;
     setBenefits([...benefits, newBenefit.trim()]);
@@ -203,9 +187,11 @@ export default function CreateProNetworkPage() {
       return;
     }
 
+    if (pricingType === "paid" && (!Number.isFinite(Number(monthlyPrice)) || Number(monthlyPrice) <= 0)) {
+      setErrorMsg("Enter a monthly price above $0, or choose a free network."); setStep(1); return;
+    }
     if (pricingType === "paid" && !isStripeReady) {
-      setErrorMsg("Stripe setup required to sell memberships. Please connect your Stripe payout account, or select Free Pro Network to publish.");
-      setStep(1);
+      await handleConnectStripe();
       return;
     }
 
@@ -247,10 +233,12 @@ export default function CreateProNetworkPage() {
 
       if (res.ok) {
         const data = await res.json();
+        draft.clear();
         router.push(`/pro-networks/${data.network.slug}`);
       } else {
         const err = await res.json();
         setErrorMsg(err.error || "Failed to publish Pro Network.");
+        if (err.code === "STRIPE_SETUP_REQUIRED") await paymentSetup.refresh();
       }
     } catch (err) {
       console.error(err);
@@ -260,7 +248,7 @@ export default function CreateProNetworkPage() {
     }
   };
 
-  if (isPending) {
+  if (isPending || (session?.user && !draft.ready)) {
     return (
       <div className="pn-page pn-create min-h-screen flex items-center justify-center bg-[#f4f6fb] dark:bg-[#0c1527]">
         <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
@@ -394,21 +382,7 @@ export default function CreateProNetworkPage() {
               <i key={i} data-complete={i + 1 <= step} />
             ))}
           </div>
-          {stripeJustConnected && (
-            <div className="mb-6 p-4 rounded-2xl bg-blue-950/40 dark:bg-[#0c1a2e] border border-blue-500/30 text-blue-600 dark:text-blue-300 text-xs font-bold flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
-                <span>Stripe account connected successfully! You are now set up to charge for memberships.</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStripeJustConnected(false)}
-                className="text-slate-400 hover:text-white px-1"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          <CreationDraftNotice message={draft.message} onSave={() => draft.save()} busy={submitting || paymentSetup.connecting} />
 
           {errorMsg && (
             <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-bold flex items-center gap-2">
@@ -540,8 +514,7 @@ export default function CreateProNetworkPage() {
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Charge recurring monthly dues. 0% TCP fee — you keep
-                        100% of subscriber revenue via direct Stripe payouts.
+                        Charge recurring monthly dues with direct payments to your Stripe account. No platform commission; Stripe fees apply.
                       </p>
                     </button>
                   </div>
@@ -599,76 +572,10 @@ export default function CreateProNetworkPage() {
                         </span>
                       </div>
 
-                      {!isStripeReady ? (
-                        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-slate-900 dark:text-white space-y-3">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
-                              <DollarSign className="w-4 h-4" />
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-                                Stripe Setup Required To Sell Memberships
-                              </p>
-                              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                              To charge members a recurring monthly fee, connect your Stripe account. Subscription dues are charged directly on your account; Stripe deducts its processing fees and the platform takes 0%.
-                              </p>
-                            </div>
-                          </div>
-                          {stripeError && (
-                            <p className="text-xs font-semibold text-rose-500 bg-rose-500/10 p-2.5 rounded-xl">{stripeError}</p>
-                          )}
-                          <div className="flex items-center gap-3 pt-1">
-                            <button
-                              type="button"
-                              disabled={connectingStripe}
-                              onClick={handleConnectStripe}
-                              className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-[#0a1628] font-black text-xs inline-flex items-center gap-2 transition-all shadow-md active:scale-95 disabled:opacity-60 cursor-pointer"
-                            >
-                              {connectingStripe ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                              <span>Connect Stripe Account</span>
-                            </button>
-                            <Link
-                              href="/seller-dashboard"
-                              target="_blank"
-                              className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-amber-500 underline underline-offset-4"
-                            >
-                              Open Seller Dashboard ↗
-                            </Link>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3.5 rounded-xl bg-blue-950/40 dark:bg-[#0c1a2e] border border-blue-500/30 text-blue-200 dark:text-blue-200 text-xs space-y-1">
-                          <div className="flex items-center gap-2 font-bold text-blue-600 dark:text-blue-300">
-                            <CheckCircle2 className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
-                            <span>
-                              Stripe Payouts Connected • 0% TCP Platform Fee
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                            Your Stripe Connect account is active. Subscription dues are charged directly to your account; Stripe deducts its processing fees and the platform takes 0%. You keep{" "}
-                            <strong>
-                              100% of recurring member subscriptions
-                            </strong>
-                            , deposited directly to your bank account via Stripe.
-                          </p>
-                        </div>
-                      )}
+                      <SellerPaymentSetup id="network-payment-setup" paid setup={paymentSetup} onConnect={handleConnectStripe} onFree={() => { setPricingType("free"); setErrorMsg(""); }} />
                     </div>
                   ) : (
-                    <div className="p-4 rounded-2xl bg-blue-950/40 dark:bg-[#0c1a2e] border border-blue-500/30 text-blue-200 dark:text-blue-200 text-xs space-y-1.5">
-                      <div className="flex items-center gap-2 font-bold text-blue-600 dark:text-blue-300">
-                        <CheckCircle2 className="w-4 h-4 text-blue-500 dark:text-blue-400 shrink-0" />
-                        <span>
-                          Free Community Network Selected ($0.00 / month)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-300 dark:text-slate-300 leading-relaxed">
-                        Members can join your Pro Network instantly with zero
-                        payment hurdles or credit card entry. You can update
-                        your network&apos;s pricing at any time in your Network
-                        Management dashboard.
-                      </p>
-                    </div>
+                    <SellerPaymentSetup id="network-free-setup" paid={false} setup={paymentSetup} onConnect={handleConnectStripe} onFree={() => setPricingType("free")} />
                   )}
                 </div>
 
@@ -1142,6 +1049,7 @@ export default function CreateProNetworkPage() {
                 </span>
               </section>
             )}
+            {step === 5 && <SellerPaymentSetup id="network-final-payment" paid={pricingType === "paid"} setup={paymentSetup} onConnect={handleConnectStripe} onFree={() => { setPricingType("free"); setErrorMsg(""); }} busy={submitting} />}
             {/* Navigation Controls */}
             <div className="pn-create-navigation">
               {step > 1 ? (
@@ -1164,10 +1072,6 @@ export default function CreateProNetworkPage() {
                       setErrorMsg("Please enter a network name to proceed.");
                       return;
                     }
-                    if (step === 1 && pricingType === "paid" && !isStripeReady) {
-                      setErrorMsg("Stripe setup required to sell memberships. Please connect your Stripe payout account, or select Free Pro Network to proceed.");
-                      return;
-                    }
                     setErrorMsg("");
                     setStep((s) => (s + 1) as typeof step);
                   }}
@@ -1179,7 +1083,7 @@ export default function CreateProNetworkPage() {
               ) : (
                 <button
                   type="button"
-                  disabled={submitting}
+                  disabled={submitting || paymentSetup.connecting || (pricingType === "paid" && paymentSetup.state === "checking")}
                   onClick={handlePublish}
                   data-primary="true"
                   className="px-8 py-3.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-[#0a1628] text-xs font-black hover:from-amber-300 hover:to-amber-400 transition-all shadow-xl shadow-amber-400/20 hover:scale-105 active:scale-95 disabled:opacity-50 flex items-center gap-2"
@@ -1192,7 +1096,7 @@ export default function CreateProNetworkPage() {
                   ) : (
                     <>
                       <Crown className="w-4 h-4" />
-                      <span>Launch my network</span>
+                      <span>{paymentSetup.connecting ? "Opening Stripe…" : pricingType === "paid" && !isStripeReady ? sellerPublishLabel(paymentSetup.state) : "Launch my network"}</span>
                     </>
                   )}
                 </button>

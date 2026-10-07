@@ -1,3 +1,4 @@
+import { requireDirectChargeAccount } from "@/lib/stripe-direct-connect";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
@@ -148,43 +149,16 @@ export async function POST(
           cancel_url: `${appUrl}/pro-networks/${slug}`,
         };
 
-        // Verify charges_enabled with Stripe if not yet flagged in DB
-        let isChargesEnabled = network.owner?.stripeOnboarded;
-        if (!isChargesEnabled && network.owner?.stripeAccountId) {
-          try {
-            const acct = await stripe.accounts.retrieve(network.owner.stripeAccountId);
-            if (acct.charges_enabled) {
-              isChargesEnabled = true;
-              await prisma.user.update({
-                where: { id: network.ownerId },
-                data: { stripeOnboarded: true },
-              }).catch(() => {});
-            }
-          } catch (err: any) {
-            console.warn("[Pro Network Checkout] Failed to check owner account status:", err?.message);
-          }
-        }
-
-        if (!network.owner?.stripeAccountId) {
-          return NextResponse.json(
-            { error: "This Pro Network host has not yet connected their Stripe payout account to receive membership payments. Subscriptions are paused until setup is complete." },
-            { status: 400 }
-          );
-        }
-
-        if (!isChargesEnabled) {
-          return NextResponse.json(
-            { error: "This Pro Network host's Stripe payout account is still completing onboarding. Please try again shortly." },
-            { status: 400 }
-          );
-        }
+        const accountId = await requireDirectChargeAccount(stripe, network.owner?.stripeAccountId);
+        sessionParams.success_url += "&stripe_account=" + encodeURIComponent(accountId);
+        sessionParams.subscription_data = { metadata: { type: "pro_network_sub", networkId: network.id, userId, ownerId: network.ownerId } };
 
         // Create the subscription in the host's connected account. The host is
         // the merchant of record and pays Stripe's processing fees directly;
         // the platform never receives or transfers the membership payment.
         const stripeSession = await stripe.checkout.sessions.create(
           sessionParams,
-          { stripeAccount: network.owner.stripeAccountId }
+          { stripeAccount: accountId }
         );
         return NextResponse.json({ url: stripeSession.url });
       } catch (stripeError: any) {
@@ -196,45 +170,8 @@ export async function POST(
       }
     }
 
-    // Fallback direct activation for development or test environment
-    await prisma.proNetworkMember.upsert({
-      where: {
-        networkId_userId: {
-          networkId: network.id,
-          userId,
-        },
-      },
-      create: {
-        networkId: network.id,
-        userId,
-        role: "MEMBER",
-        status: "ACTIVE",
-      },
-      update: {
-        status: "ACTIVE",
-        joinedAt: new Date(),
-      },
-    });
-
-    await prisma.proNetwork.update({
-      where: { id: network.id },
-      data: { memberCount: { increment: 1 } },
-    });
-
-    await prisma.notification.create({
-      data: {
-        userId: network.ownerId,
-        type: "SYSTEM",
-        title: "🎉 New Pro Network Member!",
-        message: `${session.user.name || "A new member"} joined your Pro Network: ${network.name}`,
-        link: `/pro-networks/${slug}`,
-      },
-    }).catch(() => {});
-
-    return NextResponse.json({
-      success: true,
-      redirectUrl: `${appUrl}/pro-networks/${slug}?joined=1`,
-    });
+    // Missing Stripe configuration must never grant a paid membership.
+    return NextResponse.json({ error: "Payments are temporarily unavailable. Please try again later." }, { status: 503 });
   } catch (error) {
     console.error("Pro Network checkout error:", error);
     return NextResponse.json({ error: "Failed to process enrollment" }, { status: 500 });

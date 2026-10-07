@@ -1,3 +1,4 @@
+import { fulfillDirectCheckout } from "@/lib/stripe-direct-connect";
 import { grantAcademyMembershipBonus, reconcileAcademyMembershipBonus } from "@/lib/academy-membership-bonus";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -27,14 +28,15 @@ export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { sessionId } = await req.json() as { sessionId?: string };
+  const { sessionId, stripeAccount } = await req.json() as { sessionId?: string; stripeAccount?: string };
+  if (stripeAccount && (typeof stripeAccount !== "string" || !/^acct_[a-zA-Z0-9]+$/.test(stripeAccount))) return NextResponse.json({ error: "Invalid account" }, { status: 400 });
   if (!sessionId) return NextResponse.json({ error: "Missing sessionId" }, { status: 400 });
 
   let stripeSession: Stripe.Checkout.Session;
   try {
     stripeSession = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["subscription", "subscription.items.data.price"],
-    });
+    }, stripeAccount ? { stripeAccount } : undefined);
   } catch {
     return NextResponse.json({ error: "Invalid session" }, { status: 400 });
   }
@@ -44,8 +46,18 @@ export async function POST(req: NextRequest) {
   if (userId !== session.user.id)
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  if (stripeSession.payment_status === "unpaid")
+  if (stripeSession.status !== "complete" || stripeSession.payment_status === "unpaid")
     return NextResponse.json({ error: "Payment not completed" }, { status: 400 });
+
+  if (stripeAccount) {
+    try {
+      await fulfillDirectCheckout(stripe, stripeSession, stripeAccount);
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error("Connected payment verification failed:", error);
+      return NextResponse.json({ error: "Unable to confirm this seller payment. Please retry." }, { status: 409 });
+    }
+  }
 
   const membershipBonus = await grantAcademyMembershipBonus(stripeSession, userId);
 

@@ -1,3 +1,4 @@
+import { requireDirectChargeAccount } from "@/lib/stripe-direct-connect";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/lib/auth";
@@ -30,6 +31,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No listings specified for checkout" }, { status: 400 });
   }
 
+  if (rawIds.length > 100 || rawIds.some(id => typeof id !== "string")) return NextResponse.json({ error: "Invalid cart" }, { status: 400 });
+
   // Fetch all requested listings
   const listings = await prisma.marketplaceListing.findMany({
     where: { id: { in: rawIds } },
@@ -40,6 +43,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       error: "No matching marketplace listings found. If you selected a Pro Network, please join directly from the Network page.",
     }, { status: 404 });
+  }
+
+  if (listings.length !== new Set(rawIds).size || listings.some(l => l.status !== "APPROVED")) {
+    return NextResponse.json({ error: "One or more listings are unavailable." }, { status: 400 });
   }
 
   // Check if current user owns any of the listings
@@ -191,12 +198,22 @@ export async function POST(req: NextRequest) {
           unit_amount: Math.round(finalPrice * 100),
           product_data: {
             name: listing.title,
+            metadata: { listingId: listing.id },
             description: `Marketplace purchase from ${listing.user?.name || "Tax Compliance Pro Member"}`,
             images: listing.images[0] ? [listing.images[0]] : [],
           },
         },
         quantity: 1,
       });
+    }
+  }
+
+  let sellerAccountId: string | undefined;
+  if (paidListings.length) {
+    try {
+      sellerAccountId = await requireDirectChargeAccount(stripe, paidListings[0].user.stripeAccountId);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Seller payments unavailable" }, { status: 409 });
     }
   }
 
@@ -286,68 +303,21 @@ export async function POST(req: NextRequest) {
     refCode: refCode || "",
   };
 
-  // Direct Stripe Connect payment to seller's account
-  // (All items in this cart belong to the same seller)
-  const seller = paidListings[0].user;
-  let isChargesEnabled = seller.stripeOnboarded;
-
-  if (!isChargesEnabled && seller.stripeAccountId) {
-    try {
-      const acct = await stripe.accounts.retrieve(seller.stripeAccountId);
-      if (acct.charges_enabled) {
-        isChargesEnabled = true;
-        await prisma.user.update({
-          where: { id: seller.id },
-          data: { stripeOnboarded: true },
-        }).catch(() => {});
-      }
-    } catch (err: any) {
-      console.warn("[Marketplace Checkout] Check seller account status failed:", err?.message);
-    }
-  }
-
-  if (seller.stripeAccountId && isChargesEnabled) {
-    try {
-      const checkoutSession = await stripe.checkout.sessions.create(
-        {
-          mode: "payment",
-          payment_method_types: ["card"],
-          customer_email: user.email ?? undefined,
-          line_items: lineItems,
-          success_url: successUrl,
-          cancel_url: cancelUrl,
-          metadata: {
-            ...sessionMetadata,
-            sellerId: seller.id,
-            sellerStripeAccountId: seller.stripeAccountId,
-          },
-        },
-        { stripeAccount: seller.stripeAccountId }
-      );
-      return NextResponse.json({ url: checkoutSession.url, sessionId: checkoutSession.id });
-    } catch (directErr: any) {
-      console.warn("[Marketplace Checkout] Direct connect charge failed, falling back to platform checkout:", directErr?.message);
-    }
-  }
-
-  // Platform Stripe Checkout Session (for multi-item carts, or sellers completing onboarding)
+  // No platform checkout or transfer fallback: seller money stays on Stripe Connect.
   try {
+    const seller = paidListings[0].user;
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
       customer_email: user.email ?? undefined,
       line_items: lineItems,
-      success_url: successUrl,
+      success_url: successUrl + "&stripe_account=" + encodeURIComponent(sellerAccountId!),
       cancel_url: cancelUrl,
-      metadata: sessionMetadata,
-    });
-
+      metadata: { ...sessionMetadata, sellerId: seller.id, sellerStripeAccountId: sellerAccountId! },
+    }, { stripeAccount: sellerAccountId! });
     return NextResponse.json({ url: checkoutSession.url, sessionId: checkoutSession.id });
-  } catch (err: any) {
-    console.error("[Marketplace Checkout] Stripe checkout failed:", err);
-    return NextResponse.json(
-      { error: err?.message || "Failed to initiate Stripe checkout" },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error("[Marketplace Checkout] Direct checkout failed:", error);
+    return NextResponse.json({ error: "Unable to start checkout with the seller. Please retry later." }, { status: 502 });
   }
 }

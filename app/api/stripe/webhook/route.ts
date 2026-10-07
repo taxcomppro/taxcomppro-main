@@ -1,3 +1,4 @@
+import { handleDirectConnectEvent } from "@/lib/stripe-direct-connect";
 import { grantAcademyMembershipBonus, reconcileAcademyMembershipBonus } from "@/lib/academy-membership-bonus";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -29,22 +30,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing stripe-signature header" }, { status: 400 });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error("[Stripe Webhook] STRIPE_WEBHOOK_SECRET environment variable is missing on server");
-    return NextResponse.json({ error: "STRIPE_WEBHOOK_SECRET not configured on server" }, { status: 500 });
+  const webhookSecrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter((value): value is string => !!value);
+  if (!webhookSecrets.length) return NextResponse.json({ error: "Stripe webhook is not configured" }, { status: 500 });
+  let event: Stripe.Event | undefined;
+  for (const secret of webhookSecrets) {
+    try { event = stripe.webhooks.constructEvent(body, sig, secret); break; } catch { /* Try the other endpoint secret. */ }
   }
-
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[Stripe Webhook] Signature verification failed:", msg);
-    return NextResponse.json({ error: `Webhook signature failed: ${msg}` }, { status: 400 });
-  }
+  if (!event) return NextResponse.json({ error: "Invalid Stripe signature" }, { status: 400 });
 
   try {
+  if (await handleDirectConnectEvent(stripe, event)) return NextResponse.json({ received: true });
+  // Connected sellers cannot use their own metadata to grant platform upgrades.
+  if (event.account) {
+    const object = event.data.object as Stripe.Checkout.Session;
+    if (object.metadata?.type !== "course") return NextResponse.json({ received: true });
+  }
 
   if ((event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded")) {
     const session = event.data.object as Stripe.Checkout.Session;

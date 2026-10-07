@@ -396,6 +396,27 @@ export default function ProNetworkHubPage({
 
   // Host Stripe Connect State
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const sessionId = url.searchParams.get("session_id");
+    const stripeAccount = url.searchParams.get("stripe_account");
+    if (!sessionId || !stripeAccount) return;
+    let cancelled = false;
+    fetch("/api/stripe/verify-session", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, stripeAccount }),
+    }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Payment confirmation is pending. Reload to retry.");
+      if (!cancelled) {
+        url.searchParams.delete("session_id");
+        url.searchParams.delete("stripe_account");
+        window.location.replace(url.pathname + url.search);
+      }
+    }).catch(error => { if (!cancelled) alert(error.message); });
+    return () => { cancelled = true; };
+  }, [slug]);
+
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [disconnectingStripe, setDisconnectingStripe] = useState(false);
 

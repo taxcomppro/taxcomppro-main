@@ -1,3 +1,4 @@
+import { isDirectChargeReady, supportsSellerPaidCharges } from "@/lib/stripe-direct-connect";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
@@ -13,6 +14,7 @@ function getStripe(): Stripe {
 }
 
 function getBaseUrl(req: NextRequest): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return new URL(process.env.NEXT_PUBLIC_APP_URL).origin;
   const originHeader = req.headers.get("origin");
   if (originHeader) return originHeader.replace(/\/$/, "");
 
@@ -46,7 +48,7 @@ export async function GET() {
       try {
         const stripe = getStripe();
         const acct = await stripe.accounts.retrieve(user.stripeAccountId);
-        const onboarded = !!(acct.charges_enabled && acct.details_submitted);
+        const onboarded = isDirectChargeReady(acct);
 
         // Sync onboarding status to DB if it changed
         if (onboarded !== user.stripeOnboarded) {
@@ -56,21 +58,22 @@ export async function GET() {
           });
         }
 
+        user.stripeOnboarded = onboarded;
         accountDetails = {
           id: acct.id,
           email: acct.email,
           country: acct.country,
           chargesEnabled: acct.charges_enabled,
           payoutsEnabled: acct.payouts_enabled,
+          pendingVerification: !!acct.requirements?.pending_verification?.length,
+          detailsSubmitted: acct.details_submitted,
           onboarded,
+          requiresSetupReview: !supportsSellerPaidCharges(acct),
         };
       } catch (err: any) {
-        console.warn("Account could not be retrieved from Stripe, clearing DB reference:", err?.message);
-        // Account may have been deleted on Stripe side or invalid in this mode; clear DB
-        await prisma.user.update({
-          where: { id: session.user.id },
-          data: { stripeAccountId: null, stripeOnboarded: false },
-        });
+        // A transient Stripe failure must never erase a seller's connection.
+        console.error("Stripe account status lookup failed:", err?.message);
+        return NextResponse.json({ error: "Unable to verify Stripe status. Please retry." }, { status: 503 });
       }
     }
 
@@ -86,7 +89,7 @@ export async function GET() {
   }
 }
 
-// POST — create Express account + return onboarding link
+// POST — create seller-paid connected account + return onboarding link
 export async function POST(req: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -108,90 +111,31 @@ export async function POST(req: NextRequest) {
     const stripe = getStripe();
     let accountId = user.stripeAccountId;
 
-    // Verify existing account if stored
     if (accountId) {
-      try {
-        const existingAcct = await stripe.accounts.retrieve(accountId);
-        if (!existingAcct.capabilities?.card_payments || existingAcct.capabilities.card_payments === "inactive") {
-          await stripe.accounts.update(accountId, {
-            capabilities: {
-              transfers: { requested: true },
-              card_payments: { requested: true },
-            },
-          }).catch((err) => console.warn("Could not request card_payments capability:", err?.message));
-        }
-      } catch (checkErr: any) {
-        console.warn("Existing Stripe account is invalid or missing in Stripe, resetting:", checkErr?.message);
-        accountId = null;
-        await prisma.user.update({
-          where: { id: session.user.id },
-          data: { stripeAccountId: null, stripeOnboarded: false },
-        });
+      const existingAccount = await stripe.accounts.retrieve(accountId);
+      if (!supportsSellerPaidCharges(existingAccount)) {
+        return NextResponse.json({ code: "STRIPE_SETUP_REVIEW_REQUIRED", error: "Your existing Stripe account assigns fees or payment losses to the platform. Contact support to review migration to a seller-paid Stripe connection. Existing subscriptions must be reviewed before replacing this account." }, { status: 409 });
       }
-    }
-
-    // Create a new connected account if none exists (using Accounts v2 controller)
-    if (!accountId) {
-      let account: Stripe.Account;
-      try {
-        // Accounts v2: Marketplace model with Express dashboard, application fee/loss liability, and destination transfers
-        account = await stripe.accounts.create({
-          controller: {
-            fees: { payer: "application" },
-            losses: { payments: "application" },
-            stripe_dashboard: { type: "express" },
-            requirement_collection: "stripe",
-          },
-          email: user.email ?? undefined,
-          business_profile: {
-            name: user.name ?? undefined,
-          },
-          capabilities: {
-            transfers: { requested: true },
-            card_payments: { requested: true },
-          },
-        });
-      } catch (v2Err: any) {
-        console.warn("Accounts v2 create attempt 1 failed, trying fallback without capabilities:", v2Err?.message);
-        try {
-          // Fallback A: controller without explicit capabilities
-          account = await stripe.accounts.create({
-            controller: {
-              fees: { payer: "application" },
-              losses: { payments: "application" },
-              stripe_dashboard: { type: "express" },
-              requirement_collection: "stripe",
-            },
-            email: user.email ?? undefined,
-            business_profile: {
-              name: user.name ?? undefined,
-            },
-          });
-        } catch (v2Err2: any) {
-          console.warn("Accounts v2 create attempt 2 failed, trying managed risk fallback:", v2Err2?.message);
-          // Fallback B: If platform requires Managed Risk (losses: stripe)
-          account = await stripe.accounts.create({
-            controller: {
-              losses: { payments: "stripe" },
-              stripe_dashboard: { type: "full" },
-            },
-            email: user.email ?? undefined,
-            business_profile: {
-              name: user.name ?? undefined,
-            },
-          });
-        }
-      }
-
+    } else {
+      // Accounts v1 controller properties: full seller dashboard, seller-paid
+      // Stripe fees, and Stripe-managed negative-balance liability.
+      const account = await stripe.accounts.create({
+        controller: {
+          fees: { payer: "account" },
+          losses: { payments: "stripe" },
+          stripe_dashboard: { type: "full" },
+          requirement_collection: "stripe",
+        },
+        email: user.email ?? undefined,
+        business_profile: { name: user.name ?? undefined },
+        metadata: { platformUserId: session.user.id },
+      }, { idempotencyKey: "seller-connect:" + session.user.id });
       accountId = account.id;
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { stripeAccountId: accountId },
-      });
+      await prisma.user.update({ where: { id: session.user.id }, data: { stripeAccountId: accountId, stripeOnboarded: false } });
     }
 
     const baseUrl = getBaseUrl(req);
-    const targetReturnPath = body.returnUrl || "/seller-dashboard";
+    const targetReturnPath = typeof body.returnUrl === "string" && body.returnUrl.startsWith("/") && !body.returnUrl.startsWith("//") && !body.returnUrl.includes("\\") ? body.returnUrl : "/seller-dashboard";
     const separator = targetReturnPath.includes("?") ? "&" : "?";
 
     const refreshUrl = `${baseUrl}${targetReturnPath}${separator}stripe=refresh`;

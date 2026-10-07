@@ -1,6 +1,10 @@
 "use client";
+import SellerPaymentSetup, { CreationDraftNotice, sellerPublishLabel } from "@/components/seller/SellerPaymentSetup";
+import { useCreationDraft } from "@/lib/use-creation-draft";
+import { useSellerSetup } from "@/lib/use-seller-setup";
 
-import { useState, useRef, useEffect } from "react";
+
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   File01Icon as FileText, Tag01Icon as Tag, DollarCircleIcon as DollarSign,
@@ -316,60 +320,9 @@ export default function CreateListingPage() {
   const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
 
-  // Stripe Setup & Onboarding State
-  const [stripeStatus, setStripeStatus] = useState<{ connected: boolean; onboarded: boolean } | null>(null);
-  const [checkingStripe, setCheckingStripe] = useState(false);
-  const [connectingStripe, setConnectingStripe] = useState(false);
-  const [stripeError, setStripeError] = useState("");
-  const [stripeJustConnected, setStripeJustConnected] = useState(false);
+  const paymentSetup = useSellerSetup(user?.id);
+  const isStripeReady = paymentSetup.ready;
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search.includes("stripe=success")) {
-      setStripeJustConnected(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      setCheckingStripe(true);
-      fetch("/api/seller/stripe-connect")
-        .then((r) => r.json())
-        .then((data) => {
-          if (data && typeof data.onboarded === "boolean") {
-            setStripeStatus({ connected: !!data.connected, onboarded: !!data.onboarded });
-          }
-        })
-        .catch((err) => console.warn("Failed to check Stripe status:", err))
-        .finally(() => setCheckingStripe(false));
-    }
-  }, [user]);
-
-  const isAdmin = user?.role === "ADMIN";
-  const isStripeReady = isAdmin || !!(stripeStatus?.connected && stripeStatus?.onboarded);
-
-  const handleConnectStripe = async () => {
-    setConnectingStripe(true);
-    setStripeError("");
-    try {
-      const res = await fetch("/api/seller/stripe-connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ returnUrl: "/marketplace/create" }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        window.location.href = data.url;
-      } else {
-        setStripeError(data?.error || "Failed to start Stripe onboarding. Please try again.");
-      }
-    } catch (err: any) {
-      setStripeError(err?.message || "Network error. Please try again.");
-    } finally {
-      setConnectingStripe(false);
-    }
-  };
-
-  // Listing State (for Service, Product, or External Course)
   const [category, setCategory] = useState<"SERVICE" | "PRODUCT" | "COURSE">("SERVICE");
   const [courseDeliveryMode, setCourseDeliveryMode] = useState<"HOSTED" | "EXTERNAL">("HOSTED");
   const [title, setTitle] = useState("");
@@ -405,6 +358,36 @@ export default function CreateListingPage() {
   const [doneCourse, setDoneCourse] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const courseThumbInputRef = useRef<HTMLInputElement>(null);
+
+
+  const draft = useCreationDraft("listing", user?.id, { title, description, price, tagInput, externalUrl, courseTitle, courseSlug, courseDesc, courseThumbnail, courseCategory, courseLevel, courseIsFree, tags, images, courseLearningOutcomes, courseRequirements, courseSections, category, courseDeliveryMode, courseStep, coursePrice, meta }, value => {
+    if (typeof value.title === "string") setTitle(value.title);
+    if (typeof value.description === "string") setDescription(value.description);
+    if (typeof value.price === "string") setPrice(value.price);
+    if (typeof value.tagInput === "string") setTagInput(value.tagInput);
+    if (typeof value.externalUrl === "string") setExternalUrl(value.externalUrl);
+    if (typeof value.courseTitle === "string") setCourseTitle(value.courseTitle);
+    if (typeof value.courseSlug === "string") setCourseSlug(value.courseSlug);
+    if (typeof value.courseDesc === "string") setCourseDesc(value.courseDesc);
+    if (typeof value.courseThumbnail === "string") setCourseThumbnail(value.courseThumbnail);
+    if (typeof value.courseCategory === "string") setCourseCategory(value.courseCategory);
+    if (typeof value.courseLevel === "string") setCourseLevel(value.courseLevel);
+    if (typeof value.courseIsFree === "boolean") setCourseIsFree(value.courseIsFree);
+    if (Array.isArray(value.tags)) setTags(value.tags);
+    if (Array.isArray(value.images)) setImages(value.images);
+    if (Array.isArray(value.courseLearningOutcomes)) setCourseLearningOutcomes(value.courseLearningOutcomes);
+    if (Array.isArray(value.courseRequirements)) setCourseRequirements(value.courseRequirements);
+    if (Array.isArray(value.courseSections)) setCourseSections(value.courseSections);
+    if (["SERVICE", "PRODUCT", "COURSE"].includes(value.category)) setCategory(value.category);
+    if (value.courseDeliveryMode === "HOSTED" || value.courseDeliveryMode === "EXTERNAL") setCourseDeliveryMode(value.courseDeliveryMode);
+    if (value.courseStep === 1 || value.courseStep === 2) setCourseStep(value.courseStep);
+    if (typeof value.coursePrice === "number" && Number.isFinite(value.coursePrice)) setCoursePrice(value.coursePrice);
+    if (value.meta && typeof value.meta === "object" && !Array.isArray(value.meta)) setMeta(value.meta);
+  });
+  const handleConnectStripe = async () => {
+    if (uploadingImg || thumbUploading) { setError("Wait for your image upload to finish before opening Stripe."); return; }
+    await paymentSetup.connect("/marketplace/create", () => draft.save());
+  };
 
   const setMetaField = (k: string, v: string) => setMeta((prev) => ({ ...prev, [k]: v }));
 
@@ -634,7 +617,7 @@ export default function CreateListingPage() {
 
     const isPaid = price ? parseFloat(price) > 0 : false;
     if (isPaid && !isStripeReady) {
-      setError("Stripe setup required to sell. Please connect your Stripe payout account before creating a paid listing, or leave the price empty for a free listing.");
+      await handleConnectStripe();
       return;
     }
 
@@ -666,9 +649,11 @@ export default function CreateListingPage() {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setError(d.error || "Failed to create listing.");
+        if (d.code === "STRIPE_SETUP_REQUIRED") await paymentSetup.refresh();
         return;
       }
 
+      draft.clear();
       setDoneListing(true);
     } catch {
       setError("An unexpected error occurred.");
@@ -686,7 +671,7 @@ export default function CreateListingPage() {
 
     const isPaid = !courseIsFree && coursePrice > 0;
     if (isPaid && !isStripeReady) {
-      setError("Stripe setup required to sell courses. Please connect your Stripe payout account before publishing a paid course, or select 'Free Course'.");
+      await handleConnectStripe();
       return;
     }
 
@@ -774,6 +759,7 @@ export default function CreateListingPage() {
         });
       }
 
+      draft.clear();
       setDoneCourse(true);
     } catch {
       setError("Failed to save course curriculum.");
@@ -783,6 +769,8 @@ export default function CreateListingPage() {
   };
 
   const totalCourseLessons = courseSections.reduce((s, sec) => s + sec.lessons.length, 0);
+
+  if (user && !draft.ready) return <div className="mk-page lc-page" role="status">Restoring your workspace…</div>;
 
   if (doneListing) {
     return (
@@ -805,6 +793,7 @@ export default function CreateListingPage() {
           </Link>
           <button
             onClick={() => {
+              draft.startNew();
               setDoneListing(false);
               setTitle("");
               setDescription("");
@@ -917,26 +906,7 @@ export default function CreateListingPage() {
           </div>
         </div>
 
-        {stripeJustConnected && (
-          <div role="status" className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-sm font-semibold rounded-2xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-              <span>Stripe account connected successfully! You are now set up to sell paid listings.</span>
-            </div>
-            <button aria-label="Dismiss message" onClick={() => setStripeJustConnected(false)}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div role="alert" className="mb-6 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 text-sm font-semibold rounded-2xl flex items-center justify-between">
-            <span>{error}</span>
-            <button aria-label="Dismiss error" onClick={() => setError("")}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <CreationDraftNotice message={draft.message} onSave={() => draft.save()} busy={loading || uploadingImg || thumbUploading || paymentSetup.connecting} />
 
         <div className="lc-layout">
           {/* ── LEFT COLUMN: CATEGORY SELECTOR + LIVE PREVIEW ── */}
@@ -1443,36 +1413,7 @@ export default function CreateListingPage() {
                           )}
                         </div>
 
-                        {!courseIsFree && !isStripeReady && (
-                          <div className="mt-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-slate-900 dark:text-white space-y-2 text-xs">
-                            <div className="flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400">
-                              <AlertCircle className="w-4 h-4 shrink-0" />
-                              <span>Stripe Setup Required to Sell Paid Courses</span>
-                            </div>
-                            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                              To charge students for this course, connect your Stripe payout account. Stripe deducts its processing fees from that account; the platform takes 0%, or choose &quot;Free&quot;.
-                            </p>
-                            {stripeError && <p className="text-rose-500 text-[11px]">{stripeError}</p>}
-                            <div className="flex items-center gap-2 pt-1">
-                              <button
-                                type="button"
-                                disabled={connectingStripe}
-                                onClick={handleConnectStripe}
-                                className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-[#0a1628] font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                              >
-                                {connectingStripe ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                Connect Stripe
-                              </button>
-                              <Link
-                                href="/seller-dashboard"
-                                target="_blank"
-                                className="text-[11px] font-bold text-slate-500 hover:text-amber-400 underline underline-offset-2"
-                              >
-                                Seller Dashboard ↗
-                              </Link>
-                            </div>
-                          </div>
-                        )}
+                        <SellerPaymentSetup id="course-payment-setup" paid={!courseIsFree && coursePrice > 0} setup={paymentSetup} onConnect={handleConnectStripe} onFree={() => setCourseIsFree(true)} busy={loading || thumbUploading} />
                       </div>
                     </div>
 
@@ -1820,7 +1761,7 @@ export default function CreateListingPage() {
                         </button>
                         <button
                           type="button"
-                          disabled={loading || (!courseIsFree && coursePrice > 0 && !isStripeReady)}
+                          disabled={loading || paymentSetup.connecting || (!courseIsFree && coursePrice > 0 && paymentSetup.state === "checking")}
                           onClick={() => handlePublishCourse(true)}
                           className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#ffbe24] to-[#ffbe24] text-[#0a1628] font-black text-sm hover:shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
                         >
@@ -1829,7 +1770,7 @@ export default function CreateListingPage() {
                           ) : (
                             <Sparkles className="w-4 h-4" />
                           )}
-                          Publish Course
+                          {!courseIsFree && coursePrice > 0 && !isStripeReady ? sellerPublishLabel(paymentSetup.state) : "Publish course"}
                         </button>
                       </div>
                     </div>
@@ -1955,36 +1896,7 @@ export default function CreateListingPage() {
                       />
                     </div>
 
-                    {parseFloat(price || "0") > 0 && !isStripeReady && (
-                      <div className="mt-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-slate-900 dark:text-white space-y-2 text-xs">
-                        <div className="flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400">
-                          <AlertCircle className="w-4 h-4 shrink-0" />
-                          <span>Stripe Setup Required to Sell</span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                          To sell listings for money, connect your Stripe account so buyers pay you directly. Stripe deducts its processing fees from that account; the platform takes 0%.
-                        </p>
-                        {stripeError && <p className="text-rose-500 text-[11px]">{stripeError}</p>}
-                        <div className="flex items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            disabled={connectingStripe}
-                            onClick={handleConnectStripe}
-                            className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-[#0a1628] font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            {connectingStripe ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                            Connect Stripe
-                          </button>
-                          <Link
-                            href="/seller-dashboard"
-                            target="_blank"
-                            className="text-[11px] font-bold text-slate-500 hover:text-amber-400 underline underline-offset-2"
-                          >
-                            Seller Dashboard ↗
-                          </Link>
-                        </div>
-                      </div>
-                    )}
+                    <p className="mt-2 text-xs text-slate-500">Free offers need no Stripe account. Paid offers require verified payment setup before publishing.</p>
                   </div>
                   <div>
                     <label htmlFor="listing-url" className={lbl}>
@@ -2053,19 +1965,20 @@ export default function CreateListingPage() {
                   )}
                 </div>
 
+                <SellerPaymentSetup id="listing-payment-setup" paid={parseFloat(price || "0") > 0} setup={paymentSetup} onConnect={handleConnectStripe} onFree={() => { setPrice("0"); setError(""); }} busy={loading || uploadingImg} />
                 <div className="lc-publish-bar">
                   <div>
                     <p>Ready to share your expertise?<span>Review your preview before publishing.</span></p>
                     {parseFloat(price || "0") > 0 && !isStripeReady && (
                       <p className="text-xs text-amber-500 font-semibold mt-1 flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>Stripe payout setup required before publishing a paid listing.</span>
+                        <span>Connect Stripe first, then return here to review and publish.</span>
                       </p>
                     )}
                   </div>
                   <button
                     type="submit"
-                    disabled={loading || uploadingImg || (parseFloat(price || "0") > 0 && !isStripeReady)}
+                    disabled={loading || uploadingImg || paymentSetup.connecting || (parseFloat(price || "0") > 0 && paymentSetup.state === "checking")}
                     className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#ffbe24] to-[#ffbe24] text-[#0a1628] font-black text-sm hover:shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
                   >
                     {loading ? (
@@ -2073,7 +1986,7 @@ export default function CreateListingPage() {
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    {category === "COURSE" ? "Publish Course Listing" : "Publish Listing"}
+                    {paymentSetup.connecting ? "Opening Stripe…" : parseFloat(price || "0") > 0 && !isStripeReady ? sellerPublishLabel(paymentSetup.state) : category === "COURSE" ? "Publish course listing" : "Publish listing"}
                   </button>
                 </div>
               </form>
