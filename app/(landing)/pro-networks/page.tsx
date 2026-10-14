@@ -1,4 +1,5 @@
 "use client";
+import AcademyVideoPlayer from "@/components/AcademyVideoPlayer";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -191,36 +192,7 @@ function ProNetworksDirectory() {
               </Link>
             </div>
           </div>
-          <div className="pn-hero-art">
-            <div className="pn-art-inner">
-              <span className="pn-eyebrow">A PLACE TO BELONG</span>
-              <ArrowUpRight className="pn-art-arrow" size={25} />
-              <div className="pn-orbit" aria-hidden="true">
-                <span>
-                  <Users size={40} />
-                </span>
-                <i className="pn-orbit-one">
-                  <MessageSquare size={22} />
-                </i>
-                <i className="pn-orbit-two">
-                  <BookOpen size={22} />
-                </i>
-                <i className="pn-orbit-three">
-                  <Radio size={22} />
-                </i>
-              </div>
-              <h2>
-                Small circles.
-                <br />
-                Bigger possibilities.
-              </h2>
-              <p>Knowledge is better when it’s shared.</p>
-              <div className="pn-art-tags">
-                <span>Learn together</span>
-                <span>Build connections</span>
-              </div>
-            </div>
-          </div>
+          <AcademyVideoPlayer src="https://assets.cdn.filesafe.space/Qp3wj1F0Tcd4205IDKf3/media/6acf1944ed5644a05f0d83d9.mp4" title="Pro Networks" />
         </section>
         <div className="pn-value-strip">
           <span>

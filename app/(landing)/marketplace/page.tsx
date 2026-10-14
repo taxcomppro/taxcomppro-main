@@ -1,5 +1,6 @@
 "use client";
 
+import AcademyVideoPlayer from "@/components/AcademyVideoPlayer";
 import { Suspense, useEffect, useReducer, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -1091,12 +1092,7 @@ function MarketplaceContent() {
               </div>
             </header>
 
-            <div className="mk-banner">
-              <img
-                src="/mrkeplace_cover.png"
-                alt="TaxCompPro Marketplace — Your Marketplace. Your Opportunity. Sell Your Expertise and Buy Your Opportunity."
-              />
-            </div>
+            <div style={{ maxWidth: 880, margin: "0 auto 32px" }}><AcademyVideoPlayer src="https://assets.cdn.filesafe.space/Qp3wj1F0Tcd4205IDKf3/media/6acf19449aca90709154e0a0.mp4" title="Marketplace" /></div>
 
             <section className="mk-results" aria-label="Browse listings">
               <div className="mk-toolbar">

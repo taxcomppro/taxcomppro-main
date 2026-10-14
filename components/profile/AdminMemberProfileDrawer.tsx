@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { MemberAccessPanel } from "./MemberAccessPanel";
+import "./member-management.css";
 import {
   X,
   Mail,
   Calendar,
-  Globe,
-  MapPin,
-  Briefcase,
   Shield,
   Crown,
   CreditCard,
@@ -18,33 +17,15 @@ import {
   ExternalLink,
   DollarSign,
   UserCheck,
-  Award,
-  BookOpen,
-  MessageSquare,
-  Activity,
-  Layers,
   Clock,
-  CheckCircle2,
   AlertCircle,
-  Copy,
-  Check,
-  Eye,
-  TrendingUp,
-  Wallet,
-  Sparkles,
-  Radio,
   FileText,
   Loader2,
   ShieldCheck,
-  Plus,
-  RefreshCw,
-  Search,
-  Lock,
   Unlock,
   Package,
-  Zap,
 } from "lucide-react";
-import { getToolkit, getBundle } from "@/lib/toolkits";
+import { getToolkit } from "@/lib/toolkits";
 import { BrandAmbassadorBadge } from "@/components/badges/BrandAmbassadorBadge";
 
 interface AdminMemberProfileDrawerProps {
@@ -79,28 +60,30 @@ export function AdminMemberProfileDrawer({
   onDeleteUser,
   onAccessUpdated,
 }: AdminMemberProfileDrawerProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const userRequest = useRef<AbortController | null>(null);
+  const accessRequest = useRef<AbortController | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "access" | "membership" | "affiliate" | "payments" | "courses" | "card"
   >(initialTab);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [togglingAmbassador, setTogglingAmbassador] = useState(false);
 
   // Access & Entitlements State
   const [accessData, setAccessData] = useState<any>(null);
   const [loadingAccess, setLoadingAccess] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [accessActionBusy, setAccessActionBusy] = useState<string | null>(null);
   const [accessNotice, setAccessNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [accessSearch, setAccessSearch] = useState("");
   const [revokeConfirm, setRevokeConfirm] = useState<{ itemType: string; itemId: string; name: string } | null>(null);
 
   // Custom Grant Modal inside drawer
   const [grantModalOpen, setGrantModalOpen] = useState(false);
   const [grantItemType, setGrantItemType] = useState<"bundle" | "toolkit" | "course">("bundle");
   const [grantItemId, setGrantItemId] = useState<string>("ultimate-bundle-plus");
-  const [grantBonusMonths, setGrantBonusMonths] = useState(2);
+  const [grantBonusMonths, setGrantBonusMonths] = useState(0);
   const [grantStaffSeats, setGrantStaffSeats] = useState(10);
   const [grantNotify, setGrantNotify] = useState(true);
 
@@ -110,38 +93,48 @@ export function AdminMemberProfileDrawer({
       setUser(null);
       return;
     }
+    userRequest.current?.abort();
+    const controller = new AbortController();
+    userRequest.current = controller;
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/users/${userId}`)
+    fetch(`/api/admin/users/${userId}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch user details");
         return res.json();
       })
       .then((data) => setUser(data))
-      .catch((err) => setError(err.message || "Failed to load user"))
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!controller.signal.aborted) setError(err.message || "Failed to load user"); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
   }, [userId]);
 
   // Load User Access Matrix
   const loadAccess = useCallback(() => {
     if (!userId) return;
+    accessRequest.current?.abort();
+    const controller = new AbortController();
+    accessRequest.current = controller;
     setLoadingAccess(true);
-    fetch(`/api/admin/users/${userId}/access`)
+    setAccessError(null);
+    fetch(`/api/admin/users/${userId}/access`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load user access matrix");
         return res.json();
       })
       .then((data) => setAccessData(data))
-      .catch((err) => console.error("Access load error:", err))
-      .finally(() => setLoadingAccess(false));
+      .catch((err) => { if (!controller.signal.aborted) setAccessError(err.message || "Could not load access records"); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingAccess(false); });
   }, [userId]);
 
   useEffect(() => {
+    setUser(null);
+    setAccessData(null);
     loadUser();
+    return () => { userRequest.current?.abort(); accessRequest.current?.abort(); };
   }, [loadUser]);
 
   useEffect(() => {
-    if (userId && (activeTab === "access" || activeTab === "overview")) {
+    if (userId && (activeTab === "access" || activeTab === "overview" || activeTab === "courses")) {
       loadAccess();
     }
   }, [userId, activeTab, loadAccess]);
@@ -149,6 +142,24 @@ export function AdminMemberProfileDrawer({
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const nodes = Array.from((panelRef.current?.querySelector<HTMLElement>("[data-member-subdialog]") ?? panelRef.current)?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]') ?? []).filter(node => node.getClientRects().length);
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (!first) { event.preventDefault(); return; }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panelRef.current)) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", trap);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", trap); previous?.focus(); };
+  }, [userId]);
 
   // Handle ESC key to close drawer
   useEffect(() => {
@@ -184,8 +195,8 @@ export function AdminMemberProfileDrawer({
         body: JSON.stringify({
           itemType,
           itemId,
-          grantMembershipBonus: true,
-          membershipMonths: options?.months ?? (itemType === "bundle" ? 2 : 2),
+          grantMembershipBonus: (options?.months ?? 0) > 0,
+          membershipMonths: options?.months ?? 0,
           membershipTier: "MARKETPLACE_PLUS",
           staffSeats: options?.seats ?? (itemId === "ultimate-bundle-plus" ? 10 : 5),
           notifyUser: options?.notify ?? true,
@@ -195,6 +206,7 @@ export function AdminMemberProfileDrawer({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to grant access");
 
+      setGrantModalOpen(false);
       setAccessNotice({ type: "success", text: data.message || "Access successfully granted!" });
       loadAccess();
       loadUser();
@@ -203,7 +215,6 @@ export function AdminMemberProfileDrawer({
       setAccessNotice({ type: "error", text: err.message || "Grant operation failed" });
     } finally {
       setAccessActionBusy(null);
-      setGrantModalOpen(false);
     }
   };
 
@@ -235,15 +246,6 @@ export function AdminMemberProfileDrawer({
     }
   };
 
-  const copyAffiliateLink = () => {
-    if (!user?.affiliateProfile?.code) return;
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/upgrade?ref=${user.affiliateProfile.code}`;
-    navigator.clipboard.writeText(url);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
-
   const handleToggleBrandAmbassador = async () => {
     if (!user) return;
     setTogglingAmbassador(true);
@@ -257,9 +259,9 @@ export function AdminMemberProfileDrawer({
         const updated = await res.json();
         setUser((prev: any) => ({ ...prev, isBrandAmbassador: updated.isBrandAmbassador }));
         onAccessUpdated?.();
-      }
+      } else { throw new Error("Could not update ambassador status."); }
     } catch (err: any) {
-      console.error("Failed to toggle brand ambassador", err);
+      setAccessNotice({ type: "error", text: err.message });
     } finally {
       setTogglingAmbassador(false);
     }
@@ -273,37 +275,27 @@ export function AdminMemberProfileDrawer({
   const tc = tierBadges[tier] || tierBadges.FREE;
   const RoleIcon = rc.icon;
   const sub = user?.subscription;
-  const aff = user?.affiliateProfile;
   const card = user?.digitalCard;
   const hasCard = card?.isPurchased || card?.isActivated;
-
-  // Filtered access items for search
-  const q = accessSearch.toLowerCase().trim();
-  const filteredBundles = (accessData?.bundles || []).filter(
-    (b: any) => !q || b.name.toLowerCase().includes(q) || b.tagline?.toLowerCase().includes(q)
-  );
-  const filteredToolkits = (accessData?.toolkits || []).filter(
-    (t: any) => !q || t.name.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q)
-  );
-  const filteredCourses = (accessData?.courses || []).filter(
-    (c: any) => !q || c.title.toLowerCase().includes(q) || c.category?.toLowerCase().includes(q)
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="w-full max-w-4xl bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col h-full overflow-hidden text-slate-200 animate-in slide-in-from-right duration-300"
+        className="member-panel w-full max-w-5xl bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col h-full overflow-hidden text-slate-200 animate-in slide-in-from-right duration-300"
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-label="Member details"
       >
         {/* TOP HEADER */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#081220] shrink-0">
+        <div className="flex flex-wrap gap-3 items-center justify-between px-6 py-4 border-b border-slate-800 bg-[#081220] shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white leading-tight">Member Profile & Entitlements</h2>
+              <h2 className="text-base font-black text-white leading-tight">Member details</h2>
               <p className="text-xs text-slate-400 font-mono">ID: {userId}</p>
             </div>
           </div>
@@ -461,11 +453,9 @@ export function AdminMemberProfileDrawer({
             <div className="flex items-center gap-1 px-6 border-b border-slate-800 bg-[#060f1e] overflow-x-auto">
               {[
                 { id: "overview", label: "Overview", icon: UserCheck },
-                { id: "access", label: `Access & Entitlements (${accessData?.summary?.totalToolkitsUnlocked || user.toolkitPurchases?.length || 0})`, icon: KeyRound },
+                { id: "access", label: "Learning access", icon: KeyRound },
                 { id: "membership", label: "Membership", icon: Crown },
-                { id: "courses", label: `Courses (${user.enrollments?.length || 0})`, icon: BookOpen },
                 { id: "payments", label: `Purchases (${user.toolkitPurchases?.length + (user.marketplacePurchases?.length || 0)})`, icon: DollarSign },
-                { id: "affiliate", label: "Affiliate", icon: TrendingUp },
                 { id: "card", label: "Connect Card", icon: CreditCard },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -511,397 +501,10 @@ export function AdminMemberProfileDrawer({
               {/* ═════════════════════════════════════════════════════════════════════════════════ */}
               {/* TAB: ACCESS & ENTITLEMENTS (PRIMARY FOCUS) */}
               {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {activeTab === "access" && (
-                <div className="space-y-6 animate-in fade-in duration-150">
-                  {/* Summary Metric Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <Package className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Toolkits Unlocked</span>
-                      </div>
-                      <div className="text-2xl font-black text-amber-400 mt-1">
-                        {accessData?.summary?.totalToolkitsUnlocked ?? 0} <span className="text-xs font-normal text-slate-400">/ 6</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <BookOpen className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Courses Enrolled</span>
-                      </div>
-                      <div className="text-2xl font-black text-blue-400 mt-1">
-                        {accessData?.summary?.totalCoursesEnrolled ?? 0} <span className="text-xs font-normal text-slate-400">/ 6</span>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <Crown className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Bundle Status</span>
-                      </div>
-                      <div className="text-sm font-bold text-emerald-400 mt-2 truncate">
-                        {accessData?.summary?.hasUltimateBundlePlus
-                          ? "Ultimate PLUS Active"
-                          : accessData?.summary?.hasUltimateBundle
-                          ? "Ultimate Bundle Active"
-                          : "No Active Bundle"}
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                      <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <Shield className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Staff Training Seats</span>
-                      </div>
-                      <div className="text-2xl font-black text-purple-400 mt-1">
-                        {accessData?.summary?.totalStaffSeats ?? 0}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* QUICK GRANT ACTION BANNER */}
-                  <div className="rounded-2xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-emerald-500/10 border border-amber-500/30 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1">
-                        <Zap className="w-3 h-3" />
-                        <span>1-CLICK QUICK ACCESS GRANT</span>
-                      </span>
-                      <h4 className="text-sm font-bold text-white mt-0.5">
-                        Grant Full Access to Any Toolkit, Masterclass Course, or Bundle
-                      </h4>
-                      <p className="text-xs text-slate-300">
-                        Instantly synchronizes permissions across TaxCompPro LMS and Atlas Academy.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      <button
-                        onClick={() => handleGrantAccess("bundle", "ultimate-bundle-plus")}
-                        disabled={!!accessActionBusy || accessData?.summary?.hasUltimateBundlePlus}
-                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-all cursor-pointer"
-                      >
-                        {accessActionBusy === "bundle:ultimate-bundle-plus" ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <span>👑</span>
-                        )}
-                        <span>{accessData?.summary?.hasUltimateBundlePlus ? "Bundle Plus Active" : "Grant Ultimate PLUS"}</span>
-                      </button>
-
-                      <button
-                        onClick={() => setGrantModalOpen(true)}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition-all cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Custom Grant...</span>
-                      </button>
-
-                      <button
-                        onClick={loadAccess}
-                        disabled={loadingAccess}
-                        className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-                        title="Refresh Access Matrix"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loadingAccess ? "animate-spin" : ""}`} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Search / Filter in Access Tab */}
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={accessSearch}
-                        onChange={(e) => setAccessSearch(e.target.value)}
-                        placeholder="Search toolkits, courses, and bundles..."
-                        className="w-full bg-slate-950/60 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 1. FLAGSHIP BUNDLES SECTION */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Crown className="w-4 h-4 text-amber-400" />
-                        <span>Flagship Bundles (All-in-One Suites)</span>
-                      </h4>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {filteredBundles.map((b: any) => {
-                        const isGranted = b.hasAccess;
-                        const isBusy = accessActionBusy === `bundle:${b.id}`;
-
-                        return (
-                          <div
-                            key={b.id}
-                            className={`rounded-2xl border p-5 space-y-4 flex flex-col justify-between transition-all ${
-                              isGranted
-                                ? "bg-gradient-to-br from-amber-500/10 via-slate-900 to-slate-900 border-amber-500/40 shadow-lg shadow-amber-500/5"
-                                : "bg-slate-900/60 border-slate-800"
-                            }`}
-                          >
-                            <div className="space-y-2.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-center gap-2.5">
-                                  <span className="text-2xl">{b.icon || "🏆"}</span>
-                                  <div>
-                                    <h5 className="text-sm font-black text-white">{b.name}</h5>
-                                    <span className="text-[11px] font-bold text-amber-400">{b.badge}</span>
-                                  </div>
-                                </div>
-
-                                <span
-                                  className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border ${
-                                    isGranted
-                                      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                      : "bg-slate-800 text-slate-400 border-slate-700"
-                                  }`}
-                                >
-                                  {isGranted ? "✓ Active Access" : "Not Owned"}
-                                </span>
-                              </div>
-
-                              <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">{b.tagline}</p>
-
-                              {/* Access Source Note */}
-                              {isGranted && (
-                                <div className="text-[11px] text-slate-300 font-mono bg-slate-950/60 px-2.5 py-1 rounded-lg border border-slate-800 flex items-center justify-between">
-                                  <span>Source: {b.accessSource}</span>
-                                  {b.grantedAt && (
-                                    <span className="text-slate-400">{new Date(b.grantedAt).toLocaleDateString()}</span>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Features mini checklist */}
-                              <div className="pt-2 border-t border-slate-800/80 space-y-1">
-                                {(b.features || []).slice(0, 4).map((f: string, idx: number) => (
-                                  <div key={idx} className="text-[11px] text-slate-300 flex items-center gap-1.5 truncate">
-                                    <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                                    <span className="truncate">{f}</span>
-                                  </div>
-                                ))}
-                                {b.features?.length > 4 && (
-                                  <span className="text-[10px] text-slate-400 pl-4 block">
-                                    +{b.features.length - 4} more included assets
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
-                              <span className="text-xs font-black text-emerald-400">${b.price} USD</span>
-
-                              <div className="flex items-center gap-2">
-                                {isGranted ? (
-                                  <button
-                                    onClick={() => setRevokeConfirm({ itemType: "bundle", itemId: b.id, name: b.name })}
-                                    disabled={isBusy}
-                                    className="px-3 py-1.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold transition-all cursor-pointer"
-                                  >
-                                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : "Revoke"}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleGrantAccess("bundle", b.id)}
-                                    disabled={isBusy}
-                                    className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer"
-                                  >
-                                    {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
-                                    <span>Grant Bundle</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 2. PRACTICE TOOLKITS SECTION */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Package className="w-4 h-4 text-emerald-400" />
-                        <span>Practice Toolkits &amp; Deliverables ({accessData?.summary?.totalToolkitsUnlocked || 0} / 6)</span>
-                      </h4>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {filteredToolkits.map((t: any) => {
-                        const isGranted = t.hasAccess;
-                        const isBusy = accessActionBusy === `toolkit:${t.id}`;
-
-                        return (
-                          <div
-                            key={t.id}
-                            className={`rounded-2xl border p-4 flex flex-col justify-between space-y-3 transition-all ${
-                              isGranted
-                                ? "bg-slate-900/90 border-emerald-500/30"
-                                : "bg-slate-900/50 border-slate-800/80 opacity-80 hover:opacity-100"
-                            }`}
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-start justify-between gap-1.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xl">{t.emoji || "📦"}</span>
-                                  <div>
-                                    <h5 className="text-xs font-black text-white leading-tight">{t.name}</h5>
-                                    <span className="text-[10px] text-amber-400/80 font-bold uppercase">{t.category}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between pt-1">
-                                <span
-                                  className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
-                                    isGranted
-                                      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                                      : "bg-slate-800 text-slate-500 border-slate-700"
-                                  }`}
-                                >
-                                  {isGranted ? "✓ Unlocked" : "Locked"}
-                                </span>
-
-                                {t.trainingLicense && (
-                                  <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
-                                    {t.trainingLicense.seats} Staff Seats
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-slate-400">${t.price}</span>
-
-                              <div>
-                                {isGranted ? (
-                                  <button
-                                    onClick={() => setRevokeConfirm({ itemType: "toolkit", itemId: t.id, name: t.name })}
-                                    disabled={isBusy}
-                                    className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-[11px] font-bold transition-all cursor-pointer"
-                                  >
-                                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : "Revoke"}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleGrantAccess("toolkit", t.id)}
-                                    disabled={isBusy}
-                                    className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] flex items-center gap-1 transition-all cursor-pointer"
-                                  >
-                                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlock className="w-3 h-3" />}
-                                    <span>Grant</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* 3. VIDEO MASTERCLASSES & COURSES SECTION */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 text-blue-400" />
-                        <span>Masterclass Video Courses ({accessData?.summary?.totalCoursesEnrolled || 0} / 6)</span>
-                      </h4>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {filteredCourses.map((c: any) => {
-                        const isGranted = c.hasAccess;
-                        const isBusy = accessActionBusy === `course:${c.id}`;
-
-                        return (
-                          <div
-                            key={c.id}
-                            className={`rounded-2xl border p-4 flex flex-col justify-between space-y-3 transition-all ${
-                              isGranted
-                                ? "bg-slate-900/90 border-blue-500/30"
-                                : "bg-slate-900/50 border-slate-800/80 opacity-80 hover:opacity-100"
-                            }`}
-                          >
-                            <div className="space-y-2">
-                              {c.thumbnail && (
-                                <div className="w-full h-24 rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
-                                  <img src={c.thumbnail} alt={c.title} className="w-full h-full object-cover" />
-                                </div>
-                              )}
-
-                              <div>
-                                <h5 className="text-xs font-black text-white leading-tight">{c.title}</h5>
-                                <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
-                                  <span>{c.level}</span>
-                                  <span>·</span>
-                                  <span>{c.duration}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between pt-1">
-                                <span
-                                  className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${
-                                    isGranted
-                                      ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                                      : "bg-slate-800 text-slate-500 border-slate-700"
-                                  }`}
-                                >
-                                  {isGranted ? "✓ Enrolled" : "Not Enrolled"}
-                                </span>
-
-                                {isGranted && c.completedLessonsCount > 0 && (
-                                  <span className="text-[10px] text-slate-400">
-                                    {c.completedLessonsCount} lessons completed
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-slate-400">${c.price}</span>
-
-                              <div>
-                                {isGranted ? (
-                                  <button
-                                    onClick={() => setRevokeConfirm({ itemType: "course", itemId: c.id, name: c.title })}
-                                    disabled={isBusy}
-                                    className="px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-[11px] font-bold transition-all cursor-pointer"
-                                  >
-                                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : "Revoke"}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleGrantAccess("course", c.id)}
-                                    disabled={isBusy}
-                                    className="px-3 py-1 rounded-lg bg-blue-500 hover:bg-blue-400 text-slate-950 font-black text-[11px] flex items-center gap-1 transition-all cursor-pointer"
-                                  >
-                                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unlock className="w-3 h-3" />}
-                                    <span>Enroll</span>
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {/* TAB 1: OVERVIEW & CONTACT */}
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
+              {(activeTab === "access" || activeTab === "courses") && <MemberAccessPanel data={accessData} loading={loadingAccess} error={accessError} onRefresh={loadAccess} onGrant={(type, id) => { setGrantItemType(type); setGrantItemId(id); setGrantModalOpen(true); }} />}
               {activeTab === "overview" && (
                 <div className="space-y-6 animate-in fade-in duration-150">
+                  <section className="member-access"><h3>Account status</h3><div className="member-access-row"><span>Email</span><strong>{user.emailVerified ? "Verified" : "Not verified"}</strong><span>Phone</span><strong>{user.phone ? "Provided" : "Missing"}</strong></div><details><summary className="cursor-pointer py-3">Recent sign-ins</summary>{user.sessions?.length ? user.sessions.map((session: { id: string; createdAt: string; expiresAt: string; userAgent?: string }) => <div className="member-access-row" key={session.id}><div className="member-access-product"><strong>{new Date(session.createdAt).toLocaleString()}</strong><small className="break-all">{session.userAgent || "Device unavailable"}</small></div><span>{new Date(session.expiresAt) > new Date() ? "Active session" : "Expired"}</span></div>) : <p>No recent sessions recorded.</p>}</details></section>
                   {/* Stats Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-2xl">
@@ -1043,66 +646,6 @@ export function AdminMemberProfileDrawer({
               )}
 
               {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {/* TAB 3: AFFILIATE */}
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {activeTab === "affiliate" && (
-                <div className="space-y-6 animate-in fade-in duration-150">
-                  {aff ? (
-                    <>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Earned</div>
-                          <div className="text-2xl font-black text-emerald-400 mt-1">
-                            ${aff.totalEarned?.toFixed(2) || "0.00"}
-                          </div>
-                        </div>
-
-                        <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Balance</div>
-                          <div className="text-2xl font-black text-amber-400 mt-1">
-                            ${aff.pendingBalance?.toFixed(2) || "0.00"}
-                          </div>
-                        </div>
-
-                        <div className="bg-slate-900/70 border border-slate-800 p-4 rounded-2xl">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Paid</div>
-                          <div className="text-2xl font-black text-slate-200 mt-1">
-                            ${aff.totalPaid?.toFixed(2) || "0.00"}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                          Referral Link (Code: {aff.code})
-                        </span>
-                        <div className="bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between font-mono text-xs text-amber-400">
-                          <span className="truncate pr-2">{`${typeof window !== "undefined" ? window.location.origin : ""}/upgrade?ref=${aff.code}`}</span>
-                          <button
-                            onClick={copyAffiliateLink}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1 shrink-0 cursor-pointer"
-                          >
-                            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedLink ? "Copied" : "Copy"}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center space-y-2">
-                      <TrendingUp className="w-10 h-10 text-slate-400 mx-auto opacity-50 mb-2" />
-                      <h4 className="text-sm font-bold text-white">Affiliate Account Not Activated</h4>
-                      <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                        This member has not yet activated their affiliate referral link or earnings dashboard.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {/* TAB 4: PAYMENTS */}
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
               {activeTab === "payments" && (
                 <div className="space-y-6 animate-in fade-in duration-150">
                   <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
@@ -1116,14 +659,13 @@ export function AdminMemberProfileDrawer({
                       <div className="space-y-2">
                         {user.toolkitPurchases.map((p: any) => {
                           const tk = getToolkit(p.toolkitId);
-                          const isBundle = p.toolkitId.startsWith("bundle:");
                           return (
                             <div
                               key={p.id}
                               className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs"
                             >
                               <div className="flex items-center gap-2.5">
-                                <span className="text-lg">{isBundle ? "🏆" : (tk?.emoji || "📦")}</span>
+                                <Package className="w-5 h-5" aria-hidden="true" />
                                 <div>
                                   <div className="font-bold text-white">{tk?.name || p.toolkitId}</div>
                                   <div className="text-[11px] text-slate-400">
@@ -1145,56 +687,6 @@ export function AdminMemberProfileDrawer({
 
               {/* ═════════════════════════════════════════════════════════════════════════════════ */}
               {/* TAB 5: COURSES */}
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {activeTab === "courses" && (
-                <div className="space-y-6 animate-in fade-in duration-150">
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                      <span>Enrolled Academy Courses ({user.enrollments?.length || 0})</span>
-                    </h4>
-
-                    {user.enrollments?.length === 0 ? (
-                      <p className="text-xs text-slate-400 py-4 text-center">No course enrollments found.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {user.enrollments.map((enr: any) => {
-                          const isComplete = !!enr.completedAt;
-                          const progressCount = enr.progress?.length || 0;
-                          return (
-                            <div
-                              key={enr.id}
-                              className="bg-slate-950/70 border border-slate-800 p-4 rounded-xl space-y-2"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="font-bold text-white text-sm">
-                                  {enr.course?.title || "Course"}
-                                </div>
-                                <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    isComplete
-                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                      : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                  }`}
-                                >
-                                  {isComplete ? "Completed" : "In Progress"}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center justify-between text-xs text-slate-400">
-                                <span>Completed Lessons: {progressCount}</span>
-                                <span>Enrolled {new Date(enr.createdAt).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* ═════════════════════════════════════════════════════════════════════════════════ */}
-              {/* TAB 6: CONNECT CARD */}
               {/* ═════════════════════════════════════════════════════════════════════════════════ */}
               {activeTab === "card" && (
                 <div className="space-y-6 animate-in fade-in duration-150">
@@ -1280,7 +772,7 @@ export function AdminMemberProfileDrawer({
         {/* ═════════════════════════════════════════════════════════════════════════════════ */}
         {grantModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-100">
-            <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
+            <div data-member-subdialog role="dialog" aria-modal="true" aria-label="Grant product access" className="bg-slate-900 border border-amber-500/30 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2.5 text-amber-400">
                   <ShieldCheck className="w-5 h-5" />
@@ -1339,20 +831,20 @@ export function AdminMemberProfileDrawer({
                   >
                     {grantItemType === "bundle" && (
                       <>
-                        <option value="ultimate-bundle-plus">👑 Ultimate Bundle PLUS (All 6 Toolkits + All 6 Courses + 10 Seats)</option>
-                        <option value="ultimate-bundle">🏆 Ultimate Bundle (All 6 Toolkits + 5 Staff Seats)</option>
+                        <option value="ultimate-bundle-plus"> Ultimate Bundle PLUS (All 6 Toolkits + All 6 Courses + 10 Seats)</option>
+                        <option value="ultimate-bundle"> Ultimate Bundle (All 6 Toolkits + 5 Staff Seats)</option>
                       </>
                     )}
                     {grantItemType === "toolkit" &&
                       (accessData?.toolkits || []).map((t: any) => (
                         <option key={t.id} value={t.id}>
-                          📦 {t.name} (${t.price})
+                           {t.name} (${t.price})
                         </option>
                       ))}
                     {grantItemType === "course" &&
                       (accessData?.courses || []).map((c: any) => (
                         <option key={c.id} value={c.id}>
-                          🎓 {c.title} (${c.price})
+                           {c.title} (${c.price})
                         </option>
                       ))}
                   </select>
@@ -1398,7 +890,7 @@ export function AdminMemberProfileDrawer({
                     className="rounded border-slate-700 bg-slate-950 text-amber-500"
                   />
                   <label htmlFor="grantNotify" className="text-slate-300 text-xs cursor-pointer">
-                    Send in-app celebratory notification to member
+                    Notify member in the app
                   </label>
                 </div>
               </div>

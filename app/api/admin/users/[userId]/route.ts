@@ -32,32 +32,6 @@ export async function GET(
     include: {
       subscription: true,
       digitalCard: true,
-      affiliateProfile: {
-        include: {
-          referrals: {
-            include: {
-              referredUser: {
-                select: { id: true, name: true, email: true, image: true, createdAt: true },
-              },
-            },
-            orderBy: { createdAt: "desc" },
-            take: 25,
-          },
-          payouts: {
-            orderBy: { createdAt: "desc" },
-            take: 25,
-          },
-        },
-      },
-      referredBy: {
-        include: {
-          affiliate: {
-            include: {
-              user: { select: { id: true, name: true, email: true } },
-            },
-          },
-        },
-      },
       toolkitPurchases: {
         orderBy: { createdAt: "desc" },
       },
@@ -110,7 +84,7 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  return NextResponse.json(user);
+  return NextResponse.json(user, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function DELETE(

@@ -1,5 +1,6 @@
 "use client";
 
+import AcademyVideoPlayer from "@/components/AcademyVideoPlayer";
 import { useEffect, useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
@@ -208,36 +209,7 @@ export default function FindAProPage() {
               </span>
             </div>
           </div>
-          <aside className="fp-intro-shell">
-            <div className="fp-intro">
-              <div className="fp-intro-top">
-                <span>A GOOD CONNECTION STARTS HERE</span>
-                <span>↗</span>
-              </div>
-              <div className="fp-intro-art" aria-hidden="true">
-                <span className="fp-orbit" />
-                <span className="fp-orbit fp-orbit-two" />
-                <span className="fp-art-profile">
-                  <UserGroupIcon size={55} strokeWidth={1.1} />
-                </span>
-                <span className="fp-art-check">
-                  <Tick01Icon size={20} />
-                </span>
-                <i className="fp-art-dot one" />
-                <i className="fp-art-dot two" />
-              </div>
-              <h2>
-                Different expertise.
-                <br />
-                One shared purpose.
-              </h2>
-              <p>Helping you take the next step with confidence.</p>
-              <div className="fp-intro-tags">
-                <span>Tax & accounting</span>
-                <span>Business & beyond</span>
-              </div>
-            </div>
-          </aside>
+          <AcademyVideoPlayer src="https://assets.cdn.filesafe.space/Qp3wj1F0Tcd4205IDKf3/media/6acf1944412f76b526c084e1.mp4" title="Find a Pro" />
         </section>
         <div className="fp-value-strip">
           <span>

@@ -1,5 +1,6 @@
 "use client";
 
+import AcademyVideoPlayer from "@/components/AcademyVideoPlayer";
 import { useState } from "react";
 import { redirect } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
@@ -155,28 +156,8 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right Floating Cards */}
-            <div className="hidden lg:flex flex-col gap-4 shrink-0 min-w-[280px]">
-              {[
-                { icon: ShoppingBag, title: "Pro Marketplace", sub: "Browse verified listings", color: "text-[#ffbe24]" },
-                { icon: Users,       title: "Community Hub",    sub: "Live audio sessions",   color: "text-blue-400" },
-                { icon: Radio,       title: "Pro Talks Live",   sub: "Drop-in voice stages",  color: "text-purple-400" },
-                { icon: Shield,      title: "ATLAS AI Assistant", sub: "Real-time tax guidance", color: "text-emerald-400" },
-              ].map((c) => (
-                <div
-                  key={c.title}
-                  className="flex items-center gap-3.5 bg-white/8 hover:bg-white/12 backdrop-blur-xl border border-white/15 hover:border-[#ffbe24]/40 rounded-2xl px-5 py-4 transition-all duration-300 hover:translate-x-1 shadow-lg"
-                >
-                  <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/10">
-                    <c.icon className={`w-5 h-5 ${c.color}`} />
-                  </div>
-                  <div>
-                    <div className="text-white font-bold text-base">{c.title}</div>
-                    <div className="text-white/60 text-xs mt-0.5">{c.sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Website introduction video */}
+            <div className="w-full min-w-0 lg:flex-1"><AcademyVideoPlayer src="https://assets.cdn.filesafe.space/Qp3wj1F0Tcd4205IDKf3/media/6acf1944412f76b526c084db.mp4" title="TaxCompPro" /></div>
 
           </div>
         </div>

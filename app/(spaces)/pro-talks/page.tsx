@@ -1,5 +1,6 @@
 "use client";
 
+import AcademyVideoPlayer from "@/components/AcademyVideoPlayer";
 import { useEffect, useState, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -893,30 +894,7 @@ function ProTalksInner() {
             </div>
           </div>
 
-          <div className="ptd-art">
-            <div className="ptd-art-img">
-              <Image
-                src="/protalk.png"
-                alt="Pro Talks microphone"
-                fill
-                priority
-                className="object-cover"
-                sizes="(max-width: 760px) 90vw, 520px"
-              />
-            </div>
-            <span className="ptd-art-badge">
-              <span className="ptd-dot" aria-hidden="true" /> Live stage
-            </span>
-            <div className="ptd-art-float">
-              <span>
-                <Calendar03Icon className="w-5 h-5" />
-              </span>
-              <span>
-                <strong>{upcomingSpaces.length}</strong>
-                <small>Upcoming talk{upcomingSpaces.length === 1 ? "" : "s"}</small>
-              </span>
-            </div>
-          </div>
+          <AcademyVideoPlayer src="https://assets.cdn.filesafe.space/Qp3wj1F0Tcd4205IDKf3/media/6acf1944883b04e61944011d.mp4" title="Pro Talks" />
         </section>
 
         {/* Discovery */}

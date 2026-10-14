@@ -17,6 +17,7 @@ import "@/components/networks/networks-light.css";
 import "@/components/networks/network-hub-v2.css";
 import NetworkSkeleton from "@/components/networks/NetworkSkeleton";
 import NetworkPosts from "@/components/networks/NetworkPosts";
+import DeleteDiscussionButton from "@/components/networks/DeleteDiscussionButton";
 import "@/components/networks/network-posts.css";
 import MemberBubbleCloud from "@/components/networks/MemberBubbleCloud";
 import NetworkAnalytics from "@/components/networks/NetworkAnalytics";
@@ -1009,6 +1010,14 @@ export default function ProNetworkHubPage({
     }
   };
 
+  const handleDiscussionDeleted = (id: string) => {
+    setDiscussions(previous => previous.filter(discussion => discussion.id !== id));
+    setNetwork(previous => previous ? {
+      ...previous,
+      _count: { ...previous._count, discussions: Math.max(0, previous._count.discussions - 1) },
+    } : previous);
+  };
+
   const handleCreateDiscussion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDiscussionTitle.trim()) return;
@@ -1709,6 +1718,7 @@ export default function ProNetworkHubPage({
                           </div>
 
                           <div className="flex items-center gap-3 shrink-0">
+                            {network.isOwner && <DeleteDiscussionButton slug={slug} discussionId={disc.id} onDeleted={handleDiscussionDeleted} />}
                             <div className="flex items-center gap-1 text-slate-400 text-xs">
                               <MessageSquare className="w-3.5 h-3.5" />
                               <span>{disc.replies ?? disc._count?.comments ?? 0}</span>
@@ -2152,6 +2162,8 @@ export default function ProNetworkHubPage({
                   loadError={postsError}
                   onRetry={fetchPosts}
                   canPost={network.isMember || network.isOwner}
+                  canDelete={network.isOwner}
+                  onDeleted={handleDiscussionDeleted}
                   searching={Boolean(searchQuery)}
                   onCreated={(post) => {
                     setDiscussions((prev) => [post, ...prev]);

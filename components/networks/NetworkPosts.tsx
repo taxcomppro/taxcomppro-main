@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import DeleteDiscussionButton from "./DeleteDiscussionButton";
 import { NetworkPostSkeleton } from "./NetworkSkeleton";
 import { BubbleChatIcon, LockIcon, PinIcon, SentIcon, Loading03Icon, UserCircleIcon, Image01Icon, Video01Icon, Cancel01Icon, Link01Icon } from "hugeicons-react";
 import LinkifiedText from "@/components/ui/LinkifiedText";
@@ -41,7 +42,7 @@ function authorName(person?: Person | string | null) {
   return person.name || "Member";
 }
 
-function Post({ post, slug }: { post: NetworkPost; slug: string }) {
+function Post({ post, slug, canDelete, onDeleted }: { post: NetworkPost; slug: string; canDelete: boolean; onDeleted: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
   const [replies, setReplies] = useState<Reply[] | null>(null);
@@ -79,7 +80,7 @@ function Post({ post, slug }: { post: NetworkPost; slug: string }) {
 
   return <article className="np-card">
     {post.isPinned && <div className="np-pinned"><PinIcon size={14} /> Featured post</div>}
-    <header className="np-post-header"><Link href={profile(post.author)}><Avatar person={post.author} /></Link><div><Link className="np-author inline-flex items-center gap-1.5" href={profile(post.author)}><span>{authorName(post.author)}</span>{typeof post.author === "object" && Boolean(post.author?.isBrandAmbassador) && <BrandAmbassadorBadge size={16} />}</Link><div className="np-meta"><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time><span>·</span><LockIcon size={12} /><span>{post.isMembersOnly ? "Members only" : "Network post"}</span></div></div><span className="np-category">{post.category}</span></header>
+    <header className="np-post-header"><Link href={profile(post.author)}><Avatar person={post.author} /></Link><div><Link className="np-author inline-flex items-center gap-1.5" href={profile(post.author)}><span>{authorName(post.author)}</span>{typeof post.author === "object" && Boolean(post.author?.isBrandAmbassador) && <BrandAmbassadorBadge size={16} />}</Link><div className="np-meta"><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time><span>·</span><LockIcon size={12} /><span>{post.isMembersOnly ? "Members only" : "Network post"}</span></div></div><span className="np-category">{post.category}</span>{canDelete && <DeleteDiscussionButton slug={slug} discussionId={post.id} onDeleted={onDeleted} />}</header>
     <div className="np-post-content">
       {post.title !== automaticTitle && <h3>{post.title}</h3>}
       <p className="whitespace-pre-wrap"><LinkifiedText text={expanded || post.content.length < 650 ? post.content : `${post.content.slice(0, 650)}…`} /></p>
@@ -98,7 +99,7 @@ function Post({ post, slug }: { post: NetworkPost; slug: string }) {
   </article>;
 }
 
-export default function NetworkPosts({ slug, posts, user, canPost, onCreated, searching, loading, loadError, onRetry }: { slug: string; posts: NetworkPost[]; user?: Person; canPost: boolean; onCreated: (post: NetworkPost) => void; searching: boolean; loading: boolean; loadError: string; onRetry: () => void }) {
+export default function NetworkPosts({ slug, posts, user, canPost, canDelete, onDeleted, onCreated, searching, loading, loadError, onRetry }: { slug: string; posts: NetworkPost[]; user?: Person; canPost: boolean; canDelete: boolean; onDeleted: (id: string) => void; onCreated: (post: NetworkPost) => void; searching: boolean; loading: boolean; loadError: string; onRetry: () => void }) {
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("General");
   const [images, setImages] = useState<string[]>([]);
@@ -222,7 +223,7 @@ export default function NetworkPosts({ slug, posts, user, canPost, onCreated, se
 
     <div className="np-feed-heading"><h2>Posts</h2><span>Featured first · Newest posts</span></div>
 
-    {loading ? <div role="status" aria-label="Loading posts"><NetworkPostSkeleton /><span className="sr-only">Loading posts…</span></div> : loadError ? <div className="np-card np-empty" role="alert"><p>{loadError}</p><button className="pn-button pn-secondary" onClick={onRetry}>Try again</button></div> : posts.length === 0 ? <div className="np-card np-empty"><BubbleChatIcon size={30} /><h3>{searching ? "No matching posts" : "Start the conversation"}</h3><p>{searching ? "Try another name, topic, or keyword." : "Share a question, an idea, or an update with your network."}</p></div> : posts.slice(0, visible).map(post => <Post key={post.id} post={post} slug={slug} />)}
+    {loading ? <div role="status" aria-label="Loading posts"><NetworkPostSkeleton /><span className="sr-only">Loading posts…</span></div> : loadError ? <div className="np-card np-empty" role="alert"><p>{loadError}</p><button className="pn-button pn-secondary" onClick={onRetry}>Try again</button></div> : posts.length === 0 ? <div className="np-card np-empty"><BubbleChatIcon size={30} /><h3>{searching ? "No matching posts" : "Start the conversation"}</h3><p>{searching ? "Try another name, topic, or keyword." : "Share a question, an idea, or an update with your network."}</p></div> : posts.slice(0, visible).map(post => <Post key={post.id} post={post} slug={slug} canDelete={canDelete} onDeleted={onDeleted} />)}
 
     {posts.length > visible && <button className="pn-button pn-secondary" onClick={() => setVisible(previous => previous + 10)}>Show more posts</button>}
   </div>;

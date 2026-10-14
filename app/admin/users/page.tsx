@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { getUserProductSummary } from "@/lib/member-product-summary";
 import {
   Search,
   ChevronDown,
@@ -121,31 +122,6 @@ type SubStatusFilter = "ALL" | "ACTIVE" | "EXPIRING_SOON" | "EXPIRED" | "FREE";
 type JoinedFilter = "ALL" | "TODAY" | "7_DAYS" | "30_DAYS" | "90_DAYS" | "OLDER_90";
 type AvatarFilter = "ALL" | "WITH_AVATAR" | "NO_AVATAR";
 
-function getUserProductSummary(u: User) {
-  const tks = u.toolkitPurchases || [];
-  const enrs = u.enrollments || [];
-  const hasBundlePlus = tks.some(
-    (t) => t.toolkitId === "bundle:ultimate-bundle-plus" || t.toolkitId === "ultimate-bundle-plus"
-  );
-  const hasBundle = tks.some(
-    (t) => t.toolkitId === "bundle:ultimate-bundle" || t.toolkitId === "ultimate-bundle"
-  );
-
-  const standardToolkits = tks.filter(
-    (t) => !t.toolkitId.startsWith("bundle:") && t.toolkitId !== "admin_free_months"
-  );
-  const toolkitsCount = hasBundlePlus || hasBundle ? 6 : standardToolkits.length;
-  const coursesCount = hasBundlePlus ? 6 : enrs.length;
-
-  return {
-    hasBundlePlus,
-    hasBundle,
-    toolkitsCount,
-    coursesCount,
-    totalCount: toolkitsCount + coursesCount,
-  };
-}
-
 const roleConfig: Record<Role, { label: string; className: string; icon: React.ElementType }> = {
   MEMBER: { label: "Member", className: "bg-slate-800/60 text-slate-400 border border-slate-700/30", icon: Shield },
   ADMIN:  { label: "Admin",  className: "bg-amber-500/15 text-amber-400 border border-amber-500/20", icon: Crown },
@@ -218,7 +194,7 @@ function UserEditDropdown({
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { onClose(); anchorEl?.focus(); }
     }
 
     function handleScroll(e: Event) {
@@ -241,7 +217,7 @@ function UserEditDropdown({
     };
   }, [onClose, anchorEl]);
 
-  const right = Math.max(12, Math.min(window.innerWidth - 220, window.innerWidth - anchor.right));
+  const right = Math.max(12, Math.min(window.innerWidth - 280, window.innerWidth - anchor.right));
   const style: React.CSSProperties = {
     position: "fixed",
     ...(isAbove
@@ -255,7 +231,7 @@ function UserEditDropdown({
         }),
     right,
     zIndex: 9999,
-    minWidth: 220,
+    width: 280,
     maxWidth: "calc(100vw - 24px)",
     overflowY: "auto",
     scrollbarWidth: "thin",
@@ -266,168 +242,25 @@ function UserEditDropdown({
     <div
       ref={ref}
       style={style}
-      className={`bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 flex flex-col gap-3 text-slate-200 animate-in fade-in ${
-        isAbove ? "slide-in-from-bottom-2" : "slide-in-from-top-2"
-      } duration-100 overscroll-contain`}
+      className="member-manage-menu"
+      role="dialog"
+      aria-label="Member actions"
     >
-      {/* View Full Profile */}
-      <div>
-        <button
-          onClick={() => {
-            onClose();
-            onRequestViewProfile();
-          }}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-bold text-amber-400 hover:bg-amber-500/10 border-0 bg-transparent text-left cursor-pointer transition-all"
-        >
-          <UserIcon className="w-3.5 h-3.5 text-amber-400" />
-          <span>View Member Profile</span>
-        </button>
-      </div>
-
-      {/* Manage Access & Entitlements */}
-      <div>
-        <button
-          onClick={() => {
-            onClose();
-            onRequestManageAccess();
-          }}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 border-0 bg-transparent text-left cursor-pointer transition-all"
-        >
-          <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Manage Access &amp; Toolkits</span>
-        </button>
-      </div>
-
-      <div className="h-px bg-slate-800" />
-
-      {/* Role Section */}
-      <div>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 px-2">Assign Role</p>
-        <div className="flex flex-col gap-0.5">
-          {(["MEMBER", "ADMIN"] as Role[]).map((r) => {
-            const rc = roleConfig[r];
-            const Icon = rc.icon;
-            return (
-              <button
-                key={r}
-                onClick={() => onSelectRole(r)}
-                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-slate-800 text-slate-300 border-0 bg-transparent text-left cursor-pointer"
-              >
-                <Icon className="w-3.5 h-3.5 text-slate-500" />
-                <span className="flex-1">{rc.label}</span>
-                {currentRole === r && <Check className="w-3 h-3 text-emerald-500 ml-auto" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="h-px bg-slate-800" />
-
-      {/* Brand Ambassador Section */}
-      <div>
-        <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1.5 px-2 flex items-center justify-between">
-          <span>Brand Ambassador</span>
-        </p>
-        <button
-          onClick={() => onToggleBrandAmbassador(!isBrandAmbassador)}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-semibold transition-all border text-left cursor-pointer ${
-            isBrandAmbassador
-              ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25 shadow-sm shadow-amber-500/10"
-              : "hover:bg-slate-800 text-slate-400 border-slate-800 hover:text-slate-200"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <img
-              src="/brand-ambassador-badge.png"
-              alt="Brand Ambassador"
-              className="w-4 h-4 object-contain shrink-0"
-            />
-            <span>Brand Ambassador</span>
-          </div>
-          {isBrandAmbassador ? (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-              Active
-            </span>
-          ) : (
-            <span className="text-[10px] text-slate-500 font-normal">Off</span>
-          )}
-        </button>
-      </div>
-
-      {/* Separator */}
-      <div className="h-px bg-slate-800" />
-
-      {/* Tier Section */}
-      <div>
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 px-2">Assign Tier</p>
-        <div className="flex flex-col gap-0.5">
-          {(["FREE", "VIP", "MARKETPLACE", "MARKETPLACE_PLUS"] as Tier[]).map((t) => {
-            const tc = tierConfig[t];
-            return (
-              <button
-                key={t}
-                onClick={() => onSelectTier(t)}
-                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:bg-slate-800 text-slate-300 border-0 bg-transparent text-left cursor-pointer"
-              >
-                <span className="flex-1">{tc.label}</span>
-                {currentTier === t && <Check className="w-3 h-3 text-emerald-500 ml-auto" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Separator */}
-      <div className="h-px bg-slate-800" />
-
-      {/* Add Free Membership Months */}
-      <div>
-        <button
-          onClick={() => {
-            onClose();
-            onRequestAddMembership();
-          }}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 border-0 bg-transparent text-left cursor-pointer transition-all"
-        >
-          <Gift className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Gift Free Membership</span>
-        </button>
-      </div>
-
-      {/* Separator */}
-      <div className="h-px bg-slate-800" />
-
-      {/* Reset Password */}
-      <div>
-        <button
-          onClick={() => {
-            onClose();
-            onRequestResetPassword();
-          }}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-amber-400 hover:bg-amber-500/10 border-0 bg-transparent text-left cursor-pointer transition-all"
-        >
-          <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-          <span>Reset Password</span>
-        </button>
-      </div>
-
-      {/* Separator */}
-      <div className="h-px bg-slate-800" />
-
-      {/* Danger Zone: Delete User */}
-      <div>
-        <button
-          onClick={() => {
-            onClose();
-            onRequestDelete();
-          }}
-          className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/15 border-0 bg-transparent text-left cursor-pointer transition-all"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-red-400" />
-          <span>Delete User</span>
-        </button>
-      </div>
+      <small>Member actions</small>
+      <button onClick={() => { onClose(); onRequestViewProfile(); }}><UserIcon/><span>View member details</span></button>
+      <button onClick={() => { onClose(); onRequestManageAccess(); }}><KeyRound/><span>Manage learning access</span></button>
+      <button onClick={() => { onClose(); onRequestAddMembership(); }}><Gift/><span>Gift membership</span></button>
+      <hr/>
+      <details><summary><Shield/><span>Role & membership settings</span><ChevronDown className="ml-auto"/></summary><div>
+        <small>Account role</small>
+        {(["MEMBER", "ADMIN"] as Role[]).map(role => <button key={role} className={currentRole === role ? "selected" : ""} onClick={() => onSelectRole(role)}><Shield/><span className="flex-1">{roleConfig[role].label}</span>{currentRole === role && <Check/>}</button>)}
+        <small>Membership tier</small>
+        {(["FREE", "VIP", "MARKETPLACE", "MARKETPLACE_PLUS"] as Tier[]).map(tier => <button key={tier} className={currentTier === tier ? "selected" : ""} onClick={() => onSelectTier(tier)}><Crown/><span className="flex-1">{tierConfig[tier].label}</span>{currentTier === tier && <Check/>}</button>)}
+        <hr/><button onClick={() => onToggleBrandAmbassador(!isBrandAmbassador)} aria-pressed={isBrandAmbassador}><Shield/><span className="flex-1">Brand ambassador</span><span>{isBrandAmbassador ? "On" : "Off"}</span></button>
+      </div></details>
+      <button onClick={() => { onClose(); onRequestResetPassword(); }}><Lock/><span>Reset password</span></button>
+      <hr/>
+      <button className="danger" onClick={() => { onClose(); onRequestDelete(); }}><Trash2/><span>Delete member…</span></button>
     </div>,
     document.body
   );
@@ -513,6 +346,7 @@ function ColumnFilterPopover({
 }
 
 export default function AdminUsersPage() {
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -588,11 +422,12 @@ export default function AdminUsersPage() {
 
   // Fetch users from API (requesting up to 1000 so admin has comprehensive access)
   const fetchUsers = useCallback(() => {
+    setLoadError(null);
     setLoading(true);
     fetch("/api/admin/users?limit=1000")
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error("Could not load members. Please try again."); return r.json(); })
       .then((d) => setUsers(Array.isArray(d) ? d : []))
-      .catch(() => setUsers([]))
+      .catch((error) => setLoadError(error.message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -1214,12 +1049,13 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-5 pb-12">
+    <div className="member-management w-full max-w-none space-y-5 pb-12">
+      {loadError && <div role="alert" className="p-4 border border-red-400 rounded-lg flex justify-between gap-4">{loadError}<button onClick={fetchUsers}>Try again</button></div>}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
-            <span>User Management</span>
+            <span>Members</span>
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-slate-200 dark:border-slate-700">
               {users.length} Total
             </span>
@@ -1261,7 +1097,7 @@ export default function AdminUsersPage() {
       )}
 
       {/* Main Filter Section */}
-      <div className="bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-xl transition-colors">
+      <div className="members-filters space-y-4">
         {/* Row 1: Search + Preset Pills */}
         <div className="flex flex-col lg:flex-row gap-3">
           {/* Search Input */}
@@ -1269,7 +1105,7 @@ export default function AdminUsersPage() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name, email, or @handle..."
+              placeholder="Search name, email, phone, or @handle..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#060f1e] text-slate-900 dark:text-slate-100 text-sm pl-10 pr-9 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/10 transition-all font-[inherit]"
@@ -1285,20 +1121,17 @@ export default function AdminUsersPage() {
           </div>
 
           {/* Quick Segmented Preset Tabs */}
-          <div className="flex gap-1.5 flex-wrap items-center">
+          <div className="members-presets flex gap-1.5 flex-wrap items-center">
             {[
               { id: "ALL", label: "All Users", count: users.length },
-              { id: "BRAND_AMBASSADORS", label: "🛡️ Ambassadors", count: ambassadorCount },
-              { id: "BUNDLES_ACTIVE", label: "👑 Bundles & Toolkits", count: bundleActiveCount },
-              { id: "CONNECT_CARD", label: "💳 Connect Cards", count: connectCardCount },
+              { id: "BRAND_AMBASSADORS", label: " Ambassadors", count: ambassadorCount },
+              { id: "BUNDLES_ACTIVE", label: " Bundles & Toolkits", count: bundleActiveCount },
+              { id: "CONNECT_CARD", label: " Connect Cards", count: connectCardCount },
               { id: "MEMBER", label: "Members", count: memberCount },
               { id: "ADMIN", label: "Admins", count: adminCount },
-              { id: "PAID_TIERS", label: "⭐ Paid Tiers", count: paidCount },
+              { id: "PAID_TIERS", label: " Paid Tiers", count: paidCount },
             ].map((tab) => {
               const active = presetTab === tab.id;
-              const isCard = tab.id === "CONNECT_CARD";
-              const isBundle = tab.id === "BUNDLES_ACTIVE";
-              const isAmbassador = tab.id === "BRAND_AMBASSADORS";
               return (
                 <button
                   key={tab.id}
@@ -1311,17 +1144,8 @@ export default function AdminUsersPage() {
                       setRoleFilter("ALL");
                     }
                   }}
-                  className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
-                    active
-                      ? isAmbassador
-                        ? "bg-gradient-to-r from-amber-500 to-amber-300 text-slate-950 shadow-lg shadow-amber-500/30 font-black"
-                        : isBundle
-                        ? "bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 font-black"
-                        : isCard
-                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 font-black"
-                        : "bg-amber-500 text-[#0a1628] shadow-lg shadow-amber-500/10 font-bold"
-                      : "bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700/40"
-                  }`}
+                  aria-pressed={active}
+                  className="member-preset-button"
                 >
                   <span>{tab.label}</span>
                   <span
@@ -1337,8 +1161,8 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        {/* Row 2: Secondary / Advanced Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/80">
+        <div className="members-advanced">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">
             Filter:
           </span>
@@ -1351,10 +1175,10 @@ export default function AdminUsersPage() {
           >
             <option value="ALL">All Product Access</option>
             <option value="HAS_ANY">Has Any Product / Bundle</option>
-            <option value="ULTIMATE_BUNDLE_PLUS">👑 Ultimate Bundle PLUS ($2,400)</option>
-            <option value="ULTIMATE_BUNDLE">🏆 Ultimate Bundle ($1,200)</option>
-            <option value="HAS_TOOLKIT">📦 Has Toolkits</option>
-            <option value="HAS_COURSE">🎓 Has Masterclasses</option>
+            <option value="ULTIMATE_BUNDLE_PLUS"> Ultimate Bundle PLUS ($2,400)</option>
+            <option value="ULTIMATE_BUNDLE"> Ultimate Bundle ($1,200)</option>
+            <option value="HAS_TOOLKIT"> Has Toolkits</option>
+            <option value="HAS_COURSE"> Has Masterclasses</option>
             <option value="NO_PRODUCTS">No Products Owned</option>
           </select>
 
@@ -1443,6 +1267,7 @@ export default function AdminUsersPage() {
           )}
         </div>
 
+        </div>
         {/* Row 3: Active Filter Chips */}
         {activeFiltersCount > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
@@ -1601,7 +1426,8 @@ export default function AdminUsersPage() {
           <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl transition-colors">
+        <><label className="members-mobile-sort">Sort members<select value={sortConfig ? sortConfig.field + ":" + sortConfig.direction : "joined:desc"} onChange={event => { const [field, direction] = event.target.value.split(":"); setSortConfig({ field: field as SortField, direction: direction as "asc" | "desc" }); }}><option value="joined:desc">Newest first</option><option value="joined:asc">Oldest first</option><option value="user:asc">Name A–Z</option><option value="user:desc">Name Z–A</option></select></label>
+        <div className="members-results">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead className="bg-slate-50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 text-xs select-none">
@@ -1877,6 +1703,8 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3 text-center">
                         <button
                           type="button"
+                          aria-label={`Select ${u.name || u.email}`}
+                          aria-pressed={isSelected}
                           onClick={() => toggleSelectUser(u.id)}
                           className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
                         >
@@ -2230,6 +2058,7 @@ export default function AdminUsersPage() {
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* Column Filter Popovers */}
@@ -2426,10 +2255,10 @@ export default function AdminUsersPage() {
                 {[
                   { id: "ALL", label: "All Users" },
                   { id: "HAS_ANY", label: "Has Any Product / Bundle" },
-                  { id: "ULTIMATE_BUNDLE_PLUS", label: "👑 Ultimate Bundle PLUS" },
-                  { id: "ULTIMATE_BUNDLE", label: "🏆 Ultimate Bundle ($1,200)" },
-                  { id: "HAS_TOOLKIT", label: "📦 Has Toolkits" },
-                  { id: "HAS_COURSE", label: "🎓 Has Masterclasses" },
+                  { id: "ULTIMATE_BUNDLE_PLUS", label: " Ultimate Bundle PLUS" },
+                  { id: "ULTIMATE_BUNDLE", label: " Ultimate Bundle ($1,200)" },
+                  { id: "HAS_TOOLKIT", label: " Has Toolkits" },
+                  { id: "HAS_COURSE", label: " Has Masterclasses" },
                   { id: "NO_PRODUCTS", label: "No Products Owned" },
                 ].map((item) => (
                   <button
@@ -2519,11 +2348,11 @@ export default function AdminUsersPage() {
           }}
           onRequestAddMembership={() => {
             const target = users.find((u) => u.id === openDropdown.id);
-            if (target) handleOpenGiftModal(target);
+            if (target) { setSelectedProfileUserId(null); handleOpenGiftModal(target); }
           }}
           onRequestResetPassword={() => {
             const target = users.find((u) => u.id === openDropdown.id);
-            if (target) handleOpenResetModal(target);
+            if (target) { setSelectedProfileUserId(null); handleOpenResetModal(target); }
           }}
           onRequestDelete={() => {
             const target = users.find((u) => u.id === openDropdown.id);
@@ -2587,9 +2416,9 @@ export default function AdminUsersPage() {
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { type: "bundle" as const, label: "👑 Flagship Bundle", defaultId: "ultimate-bundle-plus" },
-                      { type: "toolkit" as const, label: "📦 Canonical Toolkit", defaultId: "30-day-tax-office" },
-                      { type: "course" as const, label: "🎓 Masterclass Course", defaultId: "30-day-tax-office-launch" },
+                      { type: "bundle" as const, label: " Flagship Bundle", defaultId: "ultimate-bundle-plus" },
+                      { type: "toolkit" as const, label: " Canonical Toolkit", defaultId: "30-day-tax-office" },
+                      { type: "course" as const, label: " Masterclass Course", defaultId: "30-day-tax-office-launch" },
                     ].map((cat) => (
                       <button
                         key={cat.type}
@@ -2630,14 +2459,14 @@ export default function AdminUsersPage() {
                       {[
                         {
                           id: "ultimate-bundle-plus",
-                          title: "👑 Ultimate Bundle PLUS ($2,400)",
+                          title: " Ultimate Bundle PLUS ($2,400)",
                           desc: "Unlocks all 6 toolkits + 6 courses + 10 staff training seats + 2 months Marketplace Plus",
                           months: 2,
                           seats: 10,
                         },
                         {
                           id: "ultimate-bundle",
-                          title: "🏆 Ultimate Bundle ($1,200)",
+                          title: " Ultimate Bundle ($1,200)",
                           desc: "Unlocks all 6 toolkits + 5 staff training seats + 1 month VIP",
                           months: 1,
                           seats: 5,

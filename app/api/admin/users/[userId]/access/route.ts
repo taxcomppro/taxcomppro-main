@@ -120,6 +120,19 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const academyProfile = await prisma.academyProfile.findFirst({ where: { OR: [{ tcpUserId: userId }, { clerkUserId: userId }] }, include: { memberships: { orderBy: { joinedAt: "asc" }, take: 1 } } });
+  const membership = academyProfile?.memberships[0];
+  const academyLicenses = academyProfile ? await prisma.academyLicense.findMany({
+    where: { OR: [ { purchaserProfileId: academyProfile.id }, { assignments: { some: { profileId: academyProfile.id, status: { not: "ACCESS_REVOKED" } } } }, ...(membership && ["ERO", "MANAGER"].includes(membership.role) ? [{ organizationId: membership.organizationId }] : []) ] },
+    include: { product: { select: { title: true, productKey: true } }, organization: { select: { name: true } } }, orderBy: { createdAt: "desc" },
+  }) : [];
+
+  // Mirror Academy's ACTIVE-license policy; retain the actual license dates in the response.
+  const activeAcademyKeys = new Set(academyLicenses.filter(license => license.status === "ACTIVE").map(license => license.product.productKey));
+  const academyPlus = activeAcademyKeys.has("bundle:ultimate-bundle-plus") || activeAcademyKeys.has("bundle:ultimate-bundle-plus-suite");
+  const academyUltimate = academyPlus || activeAcademyKeys.has("bundle:ultimate-bundle");
+  const hasAcademyAccess = (kind: "toolkit" | "course", aliases: string[]) => (kind === "toolkit" ? academyUltimate : academyPlus) || aliases.some(alias => activeAcademyKeys.has(kind + ":" + alias) || activeAcademyKeys.has("bundle:" + alias) || (kind === "course" && activeAcademyKeys.has("training:" + alias)));
+
   // Check Bundles
   const bundlePurchases = user.toolkitPurchases.filter(
     (p) => p.toolkitId.startsWith("bundle:") || p.toolkitId.startsWith("ultimate-bundle")
@@ -136,7 +149,8 @@ export async function GET(
     const purchase = bundlePurchases.find(
       (p) => p.toolkitId === `bundle:${b.id}` || p.toolkitId === b.id
     );
-    const hasAccess = b.id === "ultimate-bundle" ? (hasUltimateBundle || hasUltimateBundlePlus) : hasUltimateBundlePlus;
+    const academyAccess = b.id === "ultimate-bundle" ? academyUltimate : academyPlus;
+    const hasAccess = academyAccess || (b.id === "ultimate-bundle" ? (hasUltimateBundle || hasUltimateBundlePlus) : hasUltimateBundlePlus);
     const isManualGrant = purchase?.stripeSessionId?.startsWith("admin_") ?? false;
 
     return {
@@ -145,7 +159,7 @@ export async function GET(
       purchaseId: purchase?.id || null,
       grantedAt: purchase?.createdAt || null,
       accessSource: hasAccess
-        ? (isManualGrant ? "MANUAL_GRANT" : purchase ? "STRIPE_PURCHASE" : "BUNDLE_INCLUDED")
+        ? (isManualGrant ? "MANUAL_GRANT" : purchase ? "STRIPE_PURCHASE" : academyAccess ? "ACADEMY_LICENSE" : "BUNDLE_INCLUDED")
         : "NONE",
       stripeSessionId: purchase?.stripeSessionId || null,
     };
@@ -171,7 +185,8 @@ export async function GET(
     });
 
     const hasAccessViaBundle = hasUltimateBundle || hasUltimateBundlePlus;
-    const hasAccess = !!directPurchase || !!license || hasAccessViaBundle;
+    const academyAccess = hasAcademyAccess("toolkit", aliases);
+    const hasAccess = !!directPurchase || !!license || hasAccessViaBundle || academyAccess;
     const isManual = directPurchase?.stripeSessionId?.startsWith("admin_") ?? false;
 
     return {
@@ -186,7 +201,7 @@ export async function GET(
               : "STRIPE_PURCHASE"
             : license
             ? "TRAINING_LICENSE"
-            : "BUNDLE_INCLUDED")
+            : hasAccessViaBundle ? "BUNDLE_INCLUDED" : "ACADEMY_LICENSE")
         : "NONE",
       stripeSessionId: directPurchase?.stripeSessionId || null,
       trainingLicense: license
@@ -248,7 +263,8 @@ export async function GET(
 
     // Bundle Plus includes all courses
     const hasAccessViaBundle = hasUltimateBundlePlus;
-    const hasAccess = !!enrollment || !!license || !!directPurchase || hasAccessViaBundle;
+    const academyAccess = hasAcademyAccess("course", aliases);
+    const hasAccess = !!enrollment || !!license || !!directPurchase || hasAccessViaBundle || academyAccess;
 
     return {
       ...c,
@@ -264,7 +280,7 @@ export async function GET(
             ? "TRAINING_LICENSE"
             : directPurchase
             ? "DIRECT_PURCHASE"
-            : "BUNDLE_INCLUDED")
+            : hasAccessViaBundle ? "BUNDLE_INCLUDED" : "ACADEMY_LICENSE")
         : "NONE",
       trainingLicense: license
         ? {
@@ -294,6 +310,7 @@ export async function GET(
       image: user.image,
       createdAt: user.createdAt,
     },
+    academyLicenses: academyLicenses.map(license => ({ id: license.id, title: license.product.title, productKey: license.product.productKey, status: license.status, seats: license.seatsPurchased, expiresAt: license.expiresAt, organization: license.organization.name })),
     summary,
     bundles: bundlesStatus,
     toolkits: toolkitsStatus,
@@ -386,7 +403,7 @@ export async function POST(
   const {
     itemType, // "toolkit" | "course" | "bundle"
     itemId,   // e.g. "irs-fine-defense", "schedule-c-reconstruction", "ultimate-bundle-plus"
-    grantMembershipBonus = true,
+    grantMembershipBonus = false,
     membershipMonths = 2,
     membershipTier = "MARKETPLACE_PLUS",
     staffSeats = 5,
@@ -400,6 +417,13 @@ export async function POST(
     );
   }
 
+  const knownProduct = itemType === "bundle" ? BUNDLES.some(item => item.id === itemId) : itemType === "toolkit" ? TOOLKITS.some(item => item.id === itemId) : itemType === "course" ? COURSES.some(item => item.id === itemId || item.slug === itemId) : false;
+  if (!knownProduct || !Number.isInteger(staffSeats) || staffSeats < 1 || staffSeats > 100 || !Number.isInteger(membershipMonths) || membershipMonths < 0 || membershipMonths > 24 || !["FREE", "VIP", "MARKETPLACE", "MARKETPLACE_PLUS"].includes(membershipTier)) {
+    return NextResponse.json({ error: "Choose a valid product, seat count, and membership duration." }, { status: 400 });
+  }
+  if (grantMembershipBonus && targetUser.subscription?.stripeSubscriptionId) {
+    return NextResponse.json({ error: "This member has a billed subscription. Grant learning access without bonus months, and manage membership separately." }, { status: 409 });
+  }
   const now = new Date();
   const grantDateTag = Date.now();
   const randomSuffix = Math.random().toString(36).slice(2, 7);
