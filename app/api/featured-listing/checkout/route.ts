@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
   const origin = (await headers()).get("origin") ?? "http://localhost:3000";
   const checkoutSession = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
+    // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
     mode: "payment",
     line_items: [{
       quantity: 1,

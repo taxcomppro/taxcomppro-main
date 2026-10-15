@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
     mode: "subscription",
     ...(discountsParam ? { discounts: discountsParam } : { allow_promotion_codes: true }),
     phone_number_collection: { enabled: true },
-    payment_method_types: ["card"],
+    // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
     ...(dub.clientReferenceId ? { client_reference_id: dub.clientReferenceId } : {}),
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: successUrl,

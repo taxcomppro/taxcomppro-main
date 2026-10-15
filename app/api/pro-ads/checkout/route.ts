@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const checkoutSession = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "payment",
-    payment_method_types: ["card"],
+    // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
     line_items: [{
       price_data: {
         currency: "usd",

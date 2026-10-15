@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     customer: customerId,
     mode: "payment",
     phone_number_collection: { enabled: true },
-    payment_method_types: ["card"],
+    // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
     ...(dub.clientReferenceId ? { client_reference_id: dub.clientReferenceId } : {}),
     line_items: [{
       price_data: {

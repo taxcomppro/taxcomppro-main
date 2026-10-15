@@ -1,19 +1,17 @@
-.player {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  background: #07182d;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  padding: 18px;
-  box-shadow: 0 12px 32px rgba(7, 24, 45, 0.22);
-}
-.heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.badge { font-size: 10px; font-weight: 700; letter-spacing: .08em; color: #ffbe24; }
-.title { font-size: 12px; font-weight: 600; color: #fff; }
-.frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; background: #000; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
-.video { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
-.fallback { display: inline-block; margin-top: 12px; color: #cbd5e1; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
-.fallback:hover { color: #fff; }
-.fallback:focus-visible { outline: 2px solid #ffbe24; outline-offset: 4px; }
-@media (max-width: 480px) { .player { padding: 12px; } .heading { margin-bottom: 12px; } }
+.player { position: relative; width: 100%; min-width: 0; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 16px; background: #030a14; border: 1px solid #ffffff24; box-shadow: 0 16px 48px #0004; color: white; isolation: isolate; }
+.video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.sound { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 7px; border: 1px solid #ffffff40; border-radius: 30px; background: #07182de8; color: white; padding: 10px 14px; font: 600 12px sans-serif; cursor: pointer; }
+.bigPlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: grid; place-items: center; width: 68px; height: 68px; padding-left: 5px; border-radius: 50%; border: 1px solid #ffffff55; background: #ffbe24; color: #07182d; cursor: pointer; }
+.controls { position: absolute; bottom: 0; left: 0; right: 0; padding: 26px 12px 8px; background: linear-gradient(transparent, #020710ee); }
+.seek { display: block; width: 100%; margin: 0; accent-color: #ffbe24; cursor: pointer; height: 18px; }
+.row { display: flex; align-items: center; gap: 5px; }
+.row button { display: grid; place-items: center; border: 0; width: 36px; height: 36px; color: white; background: transparent; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
+.row button:hover { background: #ffffff24; color: #ffbe24; }
+.time { font: 11px ui-monospace, monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.spacer { flex: 1; }
+.row select { max-width: 65px; background: #07182d; color: white; border: 1px solid #ffffff30; border-radius: 5px; font-size: 12px; padding: 5px 2px; }
+.player button:focus-visible, .player select:focus-visible, .seek:focus-visible { outline: 2px solid #ffbe24; outline-offset: 2px; }
+.error { position: absolute; inset: 30% 12px auto; padding: 12px; border-radius: 8px; background: #07182de8; font-size: 13px; text-align: center; }
+.error a { color: #ffbe24; text-decoration: underline; display: block; margin-top: 6px; }
+.player:fullscreen { width: 100%; height: 100%; border: 0; border-radius: 0; }
+@media (max-width: 480px) { .sound { top: 8px; right: 8px; padding: 7px 10px; font-size: 11px; } .controls { padding: 18px 7px 4px; } .row { gap: 2px; } .row button { width: 32px; height: 32px; } .bigPlay { width: 50px; height: 50px; } }

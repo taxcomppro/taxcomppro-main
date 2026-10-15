@@ -151,7 +151,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     ];
 
     const sessionParams: any = {
-      payment_method_types: ["card"],
+      // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
       line_items: lineItems,
       mode: "payment",
       customer_email: session.user.email || undefined,

@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       "https://taxcomppro.com";
 
     const checkoutSession = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
+      // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
       line_items: [
         {
           price_data: {

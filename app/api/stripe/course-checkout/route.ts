@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
     checkoutSession = await stripe.checkout.sessions.create(
       {
         mode: "payment",
-        payment_method_types: ["card"],
+        // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
         phone_number_collection: { enabled: true },
         customer_email: user.email ?? undefined,
         ...(dub?.clientReferenceId ? { client_reference_id: dub.clientReferenceId } : {}),
@@ -235,7 +235,7 @@ export async function POST(req: NextRequest) {
     checkoutSession = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "payment",
-      payment_method_types: ["card"],
+      // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
       phone_number_collection: { enabled: true },
       ...(dub?.clientReferenceId ? { client_reference_id: dub.clientReferenceId } : {}),
       line_items: lineItems,

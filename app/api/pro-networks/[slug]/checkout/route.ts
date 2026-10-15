@@ -118,7 +118,7 @@ export async function POST(
     if (stripe) {
       try {
         const sessionParams: Stripe.Checkout.SessionCreateParams = {
-          payment_method_types: ["card"],
+          // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
           mode: "subscription",
           customer_email: session.user.email,
           line_items: [

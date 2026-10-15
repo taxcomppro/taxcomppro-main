@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
     const seller = paidListings[0].user;
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: "payment",
-      payment_method_types: ["card"],
+      // Use eligible payment methods enabled in Stripe Dashboard (including wallets and buy now, pay later).
       customer_email: user.email ?? undefined,
       line_items: lineItems,
       success_url: successUrl + "&stripe_account=" + encodeURIComponent(sellerAccountId!),
