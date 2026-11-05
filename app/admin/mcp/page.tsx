@@ -267,7 +267,8 @@ const ADMIN_CATEGORIES: AdminCategory[] = [
 
 export default function AdminMcpPage() {
   const { data: session } = useSession();
-  const [adminEmail, setAdminEmail] = useState(session?.user?.email || "tetralioncapital@gmail.com");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminApiKey, setAdminApiKey] = useState("");
   const [activeTab, setActiveTab] = useState<"claude" | "cursor" | "cli" | "http">("claude");
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -275,15 +276,23 @@ export default function AdminMcpPage() {
   const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => {
-    if (session?.user?.email) {
-      setAdminEmail(session.user.email);
+    if (session?.user) {
+      if (session.user.email) setAdminEmail(session.user.email);
+      fetch("/api/user/mcp-token")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.adminApiKey) setAdminApiKey(data.adminApiKey);
+          else if (data?.apiKey) setAdminApiKey(data.apiKey);
+          if (data?.email) setAdminEmail(data.email);
+        })
+        .catch(() => {});
     }
   }, [session]);
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "https://taxcomppro.com";
 
   const getSnippet = () => {
-    const emailToUse = adminEmail.trim() || "tetralioncapital@gmail.com";
+    const tokenToUse = adminApiKey || adminEmail.trim() || "tcp_admin_SECRET_KEY";
     if (activeTab === "claude") {
       return JSON.stringify(
         {
@@ -291,7 +300,7 @@ export default function AdminMcpPage() {
             "taxcomppro-admin": {
               url: `${appUrl}/api/mcp/admin`,
               headers: {
-                Authorization: `Bearer ${emailToUse}`,
+                Authorization: `Bearer ${tokenToUse}`,
               },
             },
           },
@@ -307,7 +316,7 @@ export default function AdminMcpPage() {
             "taxcomppro-admin": {
               url: `${appUrl}/api/mcp/admin`,
               headers: {
-                Authorization: `Bearer ${emailToUse}`,
+                Authorization: `Bearer ${tokenToUse}`,
               },
             },
           },
@@ -326,7 +335,7 @@ node mcp/dist/cli/run-admin.js`;
     }
     return `curl -X POST "${appUrl}/api/mcp/admin" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${emailToUse}" \\
+  -H "Authorization: Bearer ${tokenToUse}" \\
   -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "admin_get_platform_stats"}}'`;
   };
 
@@ -340,11 +349,12 @@ node mcp/dist/cli/run-admin.js`;
     setTesting(true);
     setTestResult(null);
     try {
+      const tokenToUse = adminApiKey || adminEmail;
       const res = await fetch("/api/mcp/admin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${adminEmail}`,
+          Authorization: `Bearer ${tokenToUse}`,
         },
         body: JSON.stringify({
           jsonrpc: "2.0",

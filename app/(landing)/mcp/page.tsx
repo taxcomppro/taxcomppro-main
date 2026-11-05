@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Sparkles,
@@ -27,6 +27,11 @@ import {
   ArrowRight,
   MessageSquare,
   Send,
+  Key,
+  Eye,
+  EyeOff,
+  Lock,
+  ShieldCheck,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 
@@ -272,13 +277,44 @@ export default function McpPage() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<"claude" | "cursor" | "windsurf" | "http">("claude");
   const [copied, setCopied] = useState(false);
-  const [userEmail, setUserEmail] = useState(session?.user?.email || "practitioner@example.com");
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [keyLoading, setKeyLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "https://taxcomppro.com";
 
+  useEffect(() => {
+    if (session?.user?.email) {
+      setUserEmail(session.user.email);
+    }
+  }, [session?.user?.email]);
+
+  useEffect(() => {
+    if (session?.user) {
+      setKeyLoading(true);
+      fetch("/api/user/mcp-token")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.apiKey) {
+            setApiKey(data.apiKey);
+            if (data.email) setUserEmail(data.email);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setKeyLoading(false));
+    }
+  }, [session?.user]);
+
+  const tokenToUse =
+    apiKey ||
+    (userEmail.trim()
+      ? `tcp_mcp_PERSONAL_KEY_FOR_${userEmail.trim()}`
+      : "tcp_mcp_YOUR_SECRET_API_KEY");
+
   const getSnippet = () => {
-    const emailToUse = userEmail.trim() || "practitioner@example.com";
     if (activeTab === "claude") {
       return JSON.stringify(
         {
@@ -286,7 +322,7 @@ export default function McpPage() {
             "taxcomppro-user": {
               url: `${appUrl}/api/mcp/user`,
               headers: {
-                Authorization: `Bearer ${emailToUse}`,
+                Authorization: `Bearer ${tokenToUse}`,
               },
             },
           },
@@ -302,7 +338,7 @@ export default function McpPage() {
             "taxcomppro-user": {
               url: `${appUrl}/api/mcp/user`,
               headers: {
-                Authorization: `Bearer ${emailToUse}`,
+                Authorization: `Bearer ${tokenToUse}`,
               },
             },
           },
@@ -318,7 +354,7 @@ export default function McpPage() {
             "taxcomppro-user": {
               serverUrl: `${appUrl}/api/mcp/user`,
               headers: {
-                Authorization: `Bearer ${emailToUse}`,
+                Authorization: `Bearer ${tokenToUse}`,
               },
             },
           },
@@ -329,7 +365,7 @@ export default function McpPage() {
     }
     return `curl -X POST "${appUrl}/api/mcp/user" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${emailToUse}" \\
+  -H "Authorization: Bearer ${tokenToUse}" \\
   -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}'`;
   };
 
@@ -337,6 +373,13 @@ export default function McpPage() {
     navigator.clipboard.writeText(getSnippet());
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCopyKeyOnly = () => {
+    if (!apiKey) return;
+    navigator.clipboard.writeText(apiKey);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2500);
   };
 
   const filteredCategories = TOOL_CATEGORIES.map((cat) => ({
@@ -371,7 +414,7 @@ export default function McpPage() {
           </h1>
 
           <p className="max-w-3xl mx-auto text-lg sm:text-xl text-slate-300 leading-relaxed mb-10">
-            Empower Claude Desktop, Cursor, ChatGPT, or Windsurf with <strong>48 dedicated tools</strong>.
+            Empower Claude Desktop, Cursor, ChatGPT, or Windsurf with <strong>54 dedicated tools</strong>.
             Your AI can now check enrolled courses, verify IRS audit defense assets, manage staff compliance seats,
             query Atlas AI, and pull ProConnect digital card analytics in real-time.
           </p>
@@ -389,7 +432,7 @@ export default function McpPage() {
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold bg-white/5 border border-white/15 text-white hover:bg-white/10 transition"
             >
               <Layers className="w-4 h-4" />
-              Browse 48 Available Tools
+              Browse 54 Available Tools
             </a>
           </div>
 
@@ -407,13 +450,13 @@ export default function McpPage() {
             </div>
             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
               <div className="text-xs font-semibold text-[#ffbe24] uppercase tracking-wider mb-1">Security</div>
-              <div className="text-sm font-bold text-white">Tenant-Isolated Access</div>
-              <div className="text-xs text-slate-400 mt-1">Your AI only sees your practice data</div>
+              <div className="text-sm font-bold text-white">Cryptographic API Keys</div>
+              <div className="text-xs text-slate-400 mt-1">HMAC-signed, user-isolated tokens</div>
             </div>
             <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
               <div className="text-xs font-semibold text-[#ffbe24] uppercase tracking-wider mb-1">Tool Count</div>
-              <div className="text-sm font-bold text-white">48 User Tools + Resources</div>
-              <div className="text-xs text-slate-400 mt-1">Full platform coverage</div>
+              <div className="text-sm font-bold text-white">54 User Tools + Resources</div>
+              <div className="text-xs text-slate-400 mt-1">Feed, toolkits, training & profile</div>
             </div>
           </div>
         </div>
@@ -427,7 +470,7 @@ export default function McpPage() {
               1-Minute Setup Configurator
             </h2>
             <p className="text-slate-400 max-w-xl mx-auto">
-              Select your AI tool below, enter your TaxComPro account email, and copy the configuration snippet.
+              Select your AI tool below to copy your personalized, cryptographically signed configuration snippet.
             </p>
           </div>
 
@@ -439,7 +482,7 @@ export default function McpPage() {
                   onClick={() => setActiveTab("claude")}
                   className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
                     activeTab === "claude"
-                      ? "bg-[#ffbe24] text-slate-950"
+                      ? "bg-[#ffbe24] text-slate-950 shadow-md shadow-amber-500/20"
                       : "text-slate-400 hover:text-white bg-white/5"
                   }`}
                 >
@@ -449,7 +492,7 @@ export default function McpPage() {
                   onClick={() => setActiveTab("cursor")}
                   className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
                     activeTab === "cursor"
-                      ? "bg-[#ffbe24] text-slate-950"
+                      ? "bg-[#ffbe24] text-slate-950 shadow-md shadow-amber-500/20"
                       : "text-slate-400 hover:text-white bg-white/5"
                   }`}
                 >
@@ -459,7 +502,7 @@ export default function McpPage() {
                   onClick={() => setActiveTab("windsurf")}
                   className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
                     activeTab === "windsurf"
-                      ? "bg-[#ffbe24] text-slate-950"
+                      ? "bg-[#ffbe24] text-slate-950 shadow-md shadow-amber-500/20"
                       : "text-slate-400 hover:text-white bg-white/5"
                   }`}
                 >
@@ -469,7 +512,7 @@ export default function McpPage() {
                   onClick={() => setActiveTab("http")}
                   className={`px-4 py-2 rounded-lg text-xs font-bold transition ${
                     activeTab === "http"
-                      ? "bg-[#ffbe24] text-slate-950"
+                      ? "bg-[#ffbe24] text-slate-950 shadow-md shadow-amber-500/20"
                       : "text-slate-400 hover:text-white bg-white/5"
                   }`}
                 >
@@ -477,16 +520,59 @@ export default function McpPage() {
                 </button>
               </div>
 
-              {/* Email Input for personalized config */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-400">Account Email:</span>
-                <input
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="bg-white/10 border border-white/15 rounded-md px-2.5 py-1 text-white text-xs focus:outline-none focus:border-[#ffbe24] w-48"
-                />
+              {/* Personal Authentication Status / API Key Bar */}
+              <div className="flex items-center gap-3">
+                {session?.user ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{session.user.name || session.user.email}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-black/50 border border-white/15 rounded-lg px-2.5 py-1 text-xs">
+                      <Key className="w-3.5 h-3.5 text-[#ffbe24]" />
+                      <span className="text-slate-300 font-mono text-[11px]">
+                        {keyLoading
+                          ? "Generating key..."
+                          : showKey
+                          ? apiKey
+                          : apiKey
+                          ? `${apiKey.slice(0, 14)}••••••••`
+                          : "No key generated"}
+                      </span>
+                      {apiKey && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setShowKey(!showKey)}
+                            className="text-slate-400 hover:text-white ml-1 p-0.5 transition"
+                            title={showKey ? "Hide Secret Key" : "Show Secret Key"}
+                          >
+                            {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCopyKeyOnly}
+                            className="text-slate-400 hover:text-[#ffbe24] ml-1 p-0.5 transition"
+                            title="Copy API Key only"
+                          >
+                            {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href="/login?next=/mcp"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#ffbe24]/15 hover:bg-[#ffbe24]/25 border border-[#ffbe24]/40 text-[#ffbe24] text-xs font-bold transition"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Sign In to Reveal Your Unique Key</span>
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -528,7 +614,7 @@ export default function McpPage() {
             <div className="px-6 py-4 bg-white/[0.02] border-t border-white/10 text-xs text-slate-400 grid sm:grid-cols-3 gap-4">
               <div>
                 <span className="font-bold text-white block mb-1">1. Copy Configuration</span>
-                Click the Copy Config button above with your registered TaxComPro email.
+                Click Copy Config above. Your personalized, cryptographically signed API key is automatically embedded.
               </div>
               <div>
                 <span className="font-bold text-white block mb-1">2. Paste in Client</span>
@@ -536,7 +622,7 @@ export default function McpPage() {
               </div>
               <div>
                 <span className="font-bold text-white block mb-1">3. Start Chatting</span>
-                Restart your LLM client. Your AI will now automatically see all 48 tools!
+                Restart your LLM client. Your AI will securely connect to all 54 practice tools!
               </div>
             </div>
           </div>
@@ -552,7 +638,7 @@ export default function McpPage() {
                 Protocol Capability Inventory
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-white">
-                All 48 User MCP Tools
+                All 54 User MCP Tools
               </h2>
               <p className="text-slate-400 mt-2">
                 Every tool available to your LLM when connected to your TaxComPro account.

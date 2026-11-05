@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { AdminSessionContext } from "@/mcp/src/common/types";
+import { verifyAdminMcpTokenSignature } from "@/lib/mcp-auth";
 
 // Admin tool imports
 import { adminAnalyticsToolDefinitions, handleAdminAnalyticsTool } from "@/mcp/src/admin-server/tools/analytics";
@@ -58,6 +59,25 @@ async function authenticateAdmin(req: NextRequest): Promise<AdminSessionContext 
         name: defaultAdmin.name,
         role: "ADMIN",
       };
+    }
+  }
+
+  // Signed Admin MCP Key check (tcp_admin_<adminId>_<sig>)
+  if (token) {
+    const verifiedAdminId = verifyAdminMcpTokenSignature(token);
+    if (verifiedAdminId) {
+      const adminUser = await prisma.user.findUnique({
+        where: { id: verifiedAdminId },
+        select: { id: true, email: true, name: true, role: true },
+      });
+      if (adminUser && adminUser.role === "ADMIN") {
+        return {
+          adminId: adminUser.id,
+          email: adminUser.email,
+          name: adminUser.name,
+          role: "ADMIN",
+        };
+      }
     }
   }
 

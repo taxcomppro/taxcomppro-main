@@ -13,8 +13,10 @@ import { networkToolDefinitions, handleNetworkTool } from "@/mcp/src/user-server
 import { spaceToolDefinitions, handleSpaceTool } from "@/mcp/src/user-server/tools/spaces";
 import { supportToolDefinitions, handleSupportTool } from "@/mcp/src/user-server/tools/support";
 import { affiliateToolDefinitions, handleAffiliateTool } from "@/mcp/src/user-server/tools/affiliate";
+import { feedToolDefinitions, handleFeedTool } from "@/mcp/src/user-server/tools/feed";
 import { userResourceDefinitions, handleUserResourceRead } from "@/mcp/src/user-server/resources/user-resources";
 import { userPromptDefinitions, handleUserGetPrompt } from "@/mcp/src/user-server/prompts/user-prompts";
+import { resolveUserFromToken } from "@/lib/mcp-auth";
 
 const allUserTools = [
   ...profileToolDefinitions,
@@ -26,35 +28,24 @@ const allUserTools = [
   ...spaceToolDefinitions,
   ...supportToolDefinitions,
   ...affiliateToolDefinitions,
+  ...feedToolDefinitions,
 ];
 
 async function authenticateUser(req: NextRequest): Promise<UserSessionContext | null> {
-  // 1. Check Bearer token (API Key, User ID, or User Email)
+  // 1. Check Bearer token or custom header (Personal API Key, Session Token, or dev fallback)
   const authHeader = req.headers.get("authorization");
   const emailHeader = req.headers.get("x-user-email");
   const idHeader = req.headers.get("x-user-id");
+  const keyHeader = req.headers.get("x-api-key");
 
-  let identifier = emailHeader || idHeader;
-  if (!identifier && authHeader?.startsWith("Bearer ")) {
-    identifier = authHeader.replace("Bearer ", "").trim();
+  let token = keyHeader || emailHeader || idHeader;
+  if (!token && authHeader?.startsWith("Bearer ")) {
+    token = authHeader.replace("Bearer ", "").trim();
   }
 
-  if (identifier) {
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [{ id: identifier }, { email: identifier }],
-      },
-      select: { id: true, email: true, name: true, role: true, tier: true },
-    });
-    if (user) {
-      return {
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        tier: user.tier,
-      };
-    }
+  if (token) {
+    const userFromToken = await resolveUserFromToken(token);
+    if (userFromToken) return userFromToken;
   }
 
   // 2. Check session cookie
@@ -169,6 +160,8 @@ export async function POST(req: NextRequest) {
           result = await handleSupportTool(name, args, user);
         } else if (affiliateToolDefinitions.some((t) => t.name === name)) {
           result = await handleAffiliateTool(name, args, user);
+        } else if (feedToolDefinitions.some((t) => t.name === name)) {
+          result = await handleFeedTool(name, args, user);
         } else {
           return NextResponse.json({
             jsonrpc,
