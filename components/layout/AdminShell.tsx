@@ -79,6 +79,7 @@ const groups = [
       { label: "Emails", href: "/admin/emails", icon: Mail01Icon },
       { label: "Support", href: "/admin/support", icon: CustomerSupportIcon },
       { label: "Atlas settings", href: "/admin/atlas", icon: Settings01Icon },
+      { label: "Admin MCP Server", href: "/admin/mcp", icon: SparklesIcon },
     ],
   },
 ];

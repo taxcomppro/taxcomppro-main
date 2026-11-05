@@ -7,13 +7,17 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "mcp:user": "tsx mcp/src/cli/run-user.ts",
+    "mcp:admin": "tsx mcp/src/cli/run-admin.ts",
+    "mcp:test": "tsx mcp/test-servers.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
     "@hookform/resolvers": "^5.2.2",
     "@livekit/components-core": "^0.12.13",
     "@livekit/components-react": "^2.9.20",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@reduxjs/toolkit": "^2.11.2",
@@ -28,7 +32,7 @@
     "livekit-client": "^2.18.6",
     "livekit-server-sdk": "^2.15.1",
     "lucide-react": "^1.11.0",
-    "next": "^16.4.0",
+    "next": "^16.4.1",
     "next-themes": "^0.4.6",
     "openai": "^6.34.0",
     "pdf-lib": "^1.17.1",
@@ -52,6 +56,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.4.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "overrides": {

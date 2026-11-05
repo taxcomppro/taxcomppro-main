@@ -81,6 +81,12 @@ const groups = [
     label: "More",
     links: [
       {
+        label: "AI & MCP Integration",
+        href: "/mcp",
+        icon: Rocket01Icon,
+        description: "Connect Claude, Cursor & LLMs",
+      },
+      {
         label: "Pro Marketing",
         href: "/pro-marketing",
         icon: Rocket01Icon,

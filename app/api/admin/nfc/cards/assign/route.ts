@@ -1,3 +1,4 @@
+import { timingSafeEqual, randomInt } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
@@ -6,7 +7,7 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1 to avoid conf
 function generateCardId(length = 6): string {
   let id = "";
   for (let i = 0; i < length; i++) {
-    id += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    id += ALPHABET[randomInt(ALPHABET.length)];
   }
   return id;
 }
@@ -22,7 +23,10 @@ async function uniqueCardId(): Promise<string> {
 
 function requireAdminKey(req: NextRequest): boolean {
   const key = req.headers.get("x-admin-key");
-  return !!(key && key === process.env.ADMIN_NFC_API_KEY);
+  const expected = process.env.ADMIN_NFC_API_KEY;
+  if (!key || !expected) return false;
+  const a = Buffer.from(key), b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://taxcomppro.com";
@@ -47,10 +51,10 @@ export async function POST(req: NextRequest) {
   // Verify the username exists as a TaxCompPro Connect Card
   const digitalCard = await prisma.digitalCard.findUnique({
     where: { username },
-    select: { username: true, user: { select: { name: true } } },
+    select: { username: true, isActivated: true, user: { select: { name: true } } },
   });
 
-  if (!digitalCard) {
+  if (!digitalCard?.isActivated) {
     return NextResponse.json(
       { error: `No TaxCompPro Connect Card found for username "${username}". The user must have an activated Connect Card.` },
       { status: 404 }

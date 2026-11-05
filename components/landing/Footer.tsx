@@ -10,6 +10,7 @@ const sections = [
   ] },
   { title: "Learn & grow", links: [
     ["Courses", "/courses"], ["Toolkits", "/toolkits"], ["Practice bundles", "/toolkits#bundles"],
+    ["MCP AI Integration", "/mcp"],
     ["My courses", "/my-courses"], ["Pro Marketing", "/pro-marketing"], ["Ask Atlas AI", "https://alwaysaskatlas.com/"],
   ] },
   { title: "For your practice", links: [

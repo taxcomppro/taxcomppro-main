@@ -1,9 +1,13 @@
+import { timingSafeEqual, randomInt } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 function requireAdminKey(req: NextRequest): boolean {
   const key = req.headers.get("x-admin-key");
-  return !!(key && key === process.env.ADMIN_NFC_API_KEY);
+  const expected = process.env.ADMIN_NFC_API_KEY;
+  if (!key || !expected) return false;
+  const a = Buffer.from(key), b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function GET(req: NextRequest) {

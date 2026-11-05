@@ -1,3 +1,4 @@
+import { courseAccess } from "@/lib/course-access";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +19,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ lessonId: string }> }
 ) {
+  const denied = await courseAccess(req.headers, await params);
+  if (denied) return denied;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -58,6 +61,8 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ lessonId: string }> }
 ) {
+  const denied = await courseAccess(req.headers, await params);
+  if (denied) return denied;
   const { lessonId } = await params;
   const quiz = await prisma.quiz.findUnique({
     where: { lessonId },

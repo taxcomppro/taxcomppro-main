@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "taxcomppro-user": {
+      "command": "node",
+      "args": [
+        "c:/Users/naeem/OneDrive/Desktop/taxcompro workspace/taxcomppro-mcp/dist/cli/run-user.js"
+      ],
+      "env": {
+        "TAXCOMPRO_USER_EMAIL": "user@example.com"
+      }
+    },
+    "taxcomppro-admin": {
+      "command": "node",
+      "args": [
+        "c:/Users/naeem/OneDrive/Desktop/taxcompro workspace/taxcomppro-mcp/dist/cli/run-admin.js"
+      ],
+      "env": {
+        "TAXCOMPRO_ADMIN_EMAIL": "tetralioncapital@gmail.com"
+      }
+    }
+  }
+}
+
