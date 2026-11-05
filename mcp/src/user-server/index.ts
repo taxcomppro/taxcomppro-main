@@ -7,18 +7,18 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { UserSessionContext } from "../common/types.js";
-import { profileToolDefinitions, handleProfileTool } from "./tools/profile.js";
-import { trainingToolDefinitions, handleTrainingTool } from "./tools/training.js";
-import { toolkitToolDefinitions, handleToolkitTool } from "./tools/toolkits.js";
-import { digitalCardToolDefinitions, handleDigitalCardTool } from "./tools/digital-card.js";
-import { marketplaceToolDefinitions, handleMarketplaceTool } from "./tools/marketplace.js";
-import { networkToolDefinitions, handleNetworkTool } from "./tools/network.js";
-import { spaceToolDefinitions, handleSpaceTool } from "./tools/spaces.js";
-import { supportToolDefinitions, handleSupportTool } from "./tools/support.js";
-import { affiliateToolDefinitions, handleAffiliateTool } from "./tools/affiliate.js";
-import { userResourceDefinitions, handleUserResourceRead } from "./resources/user-resources.js";
-import { userPromptDefinitions, handleUserGetPrompt } from "./prompts/user-prompts.js";
+import { UserSessionContext } from "../common/types";
+import { profileToolDefinitions, handleProfileTool } from "./tools/profile";
+import { trainingToolDefinitions, handleTrainingTool } from "./tools/training";
+import { toolkitToolDefinitions, handleToolkitTool } from "./tools/toolkits";
+import { digitalCardToolDefinitions, handleDigitalCardTool } from "./tools/digital-card";
+import { marketplaceToolDefinitions, handleMarketplaceTool } from "./tools/marketplace";
+import { networkToolDefinitions, handleNetworkTool } from "./tools/network";
+import { spaceToolDefinitions, handleSpaceTool } from "./tools/spaces";
+import { supportToolDefinitions, handleSupportTool } from "./tools/support";
+import { affiliateToolDefinitions, handleAffiliateTool } from "./tools/affiliate";
+import { userResourceDefinitions, handleUserResourceRead } from "./resources/user-resources";
+import { userPromptDefinitions, handleUserGetPrompt } from "./prompts/user-prompts";
 
 export function createUserMcpServer(user: UserSessionContext): Server {
   const server = new Server(

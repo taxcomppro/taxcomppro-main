@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { resolveAdminContext } from "../common/auth.js";
-import { createAdminMcpServer } from "../admin-server/index.js";
-import { disconnectDatabase } from "../common/db.js";
+import { resolveAdminContext } from "../common/auth";
+import { createAdminMcpServer } from "../admin-server/index";
+import { disconnectDatabase } from "../common/db";
 
 async function main() {
   try {

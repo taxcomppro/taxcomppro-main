@@ -1,5 +1,5 @@
-import { prisma } from "../../common/db.js";
-import { AdminSessionContext, formatSuccess, formatError, McpToolResponse } from "../../common/types.js";
+import { prisma } from "../../common/db";
+import { AdminSessionContext, formatSuccess, formatError, McpToolResponse } from "../../common/types";
 
 export const adminCommunicationsToolDefinitions = [
   {

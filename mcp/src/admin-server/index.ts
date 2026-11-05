@@ -7,21 +7,21 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { AdminSessionContext } from "../common/types.js";
-import { adminAnalyticsToolDefinitions, handleAdminAnalyticsTool } from "./tools/analytics.js";
-import { adminUserToolDefinitions, handleAdminUserTool } from "./tools/users.js";
-import { adminProvisioningToolDefinitions, handleAdminProvisioningTool } from "./tools/provisioning.js";
-import { adminModerationToolDefinitions, handleAdminModerationTool } from "./tools/moderation.js";
-import { adminCouponToolDefinitions, handleAdminCouponTool } from "./tools/coupons.js";
-import { adminCourseToolDefinitions, handleAdminCourseTool } from "./tools/courses.js";
-import { adminSpaceToolDefinitions, handleAdminSpaceTool } from "./tools/spaces.js";
-import { adminAffiliateToolDefinitions, handleAdminAffiliateTool } from "./tools/affiliate.js";
-import { adminProHubToolDefinitions, handleAdminProHubTool } from "./tools/pro-hub.js";
-import { adminAtlasToolDefinitions, handleAdminAtlasTool } from "./tools/atlas.js";
-import { adminCommunicationsToolDefinitions, handleAdminCommunicationsTool } from "./tools/communications.js";
-import { adminNfcToolDefinitions, handleAdminNfcTool } from "./tools/nfc.js";
-import { adminResourceDefinitions, handleAdminResourceRead } from "./resources/admin-resources.js";
-import { adminPromptDefinitions, handleAdminGetPrompt } from "./prompts/admin-prompts.js";
+import { AdminSessionContext } from "../common/types";
+import { adminAnalyticsToolDefinitions, handleAdminAnalyticsTool } from "./tools/analytics";
+import { adminUserToolDefinitions, handleAdminUserTool } from "./tools/users";
+import { adminProvisioningToolDefinitions, handleAdminProvisioningTool } from "./tools/provisioning";
+import { adminModerationToolDefinitions, handleAdminModerationTool } from "./tools/moderation";
+import { adminCouponToolDefinitions, handleAdminCouponTool } from "./tools/coupons";
+import { adminCourseToolDefinitions, handleAdminCourseTool } from "./tools/courses";
+import { adminSpaceToolDefinitions, handleAdminSpaceTool } from "./tools/spaces";
+import { adminAffiliateToolDefinitions, handleAdminAffiliateTool } from "./tools/affiliate";
+import { adminProHubToolDefinitions, handleAdminProHubTool } from "./tools/pro-hub";
+import { adminAtlasToolDefinitions, handleAdminAtlasTool } from "./tools/atlas";
+import { adminCommunicationsToolDefinitions, handleAdminCommunicationsTool } from "./tools/communications";
+import { adminNfcToolDefinitions, handleAdminNfcTool } from "./tools/nfc";
+import { adminResourceDefinitions, handleAdminResourceRead } from "./resources/admin-resources";
+import { adminPromptDefinitions, handleAdminGetPrompt } from "./prompts/admin-prompts";
 
 export function createAdminMcpServer(admin: AdminSessionContext): Server {
   const server = new Server(

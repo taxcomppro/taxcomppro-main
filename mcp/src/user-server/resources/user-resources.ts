@@ -1,5 +1,5 @@
-import { prisma } from "../../common/db.js";
-import { UserSessionContext } from "../../common/types.js";
+import { prisma } from "../../common/db";
+import { UserSessionContext } from "../../common/types";
 
 export const userResourceDefinitions = [
   {

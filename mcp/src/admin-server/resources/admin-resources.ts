@@ -1,5 +1,5 @@
-import { prisma } from "../../common/db.js";
-import { AdminSessionContext } from "../../common/types.js";
+import { prisma } from "../../common/db";
+import { AdminSessionContext } from "../../common/types";
 
 export const adminResourceDefinitions = [
   {

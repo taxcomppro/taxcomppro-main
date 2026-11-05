@@ -1,5 +1,5 @@
-import { prisma } from "./db.js";
-import { UserSessionContext, AdminSessionContext } from "./types.js";
+import { prisma } from "./db";
+import { UserSessionContext, AdminSessionContext } from "./types";
 
 /**
  * Resolves user context for User MCP server.
