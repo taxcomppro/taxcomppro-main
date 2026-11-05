@@ -1,23 +1,16 @@
 {
   "mcpServers": {
     "taxcomppro-user": {
-      "command": "node",
-      "args": [
-        "c:/Users/naeem/OneDrive/Desktop/taxcompro workspace/taxcomppro-mcp/dist/cli/run-user.js"
-      ],
-      "env": {
-        "TAXCOMPRO_USER_EMAIL": "your-account-email@example.com"
+      "url": "https://taxcomppro.com/api/mcp/user",
+      "headers": {
+        "Authorization": "Bearer your-account-email@example.com"
       }
     },
     "taxcomppro-admin": {
-      "command": "node",
-      "args": [
-        "c:/Users/naeem/OneDrive/Desktop/taxcompro workspace/taxcomppro-mcp/dist/cli/run-admin.js"
-      ],
-      "env": {
-        "TAXCOMPRO_ADMIN_EMAIL": "admin@taxcomppro.com"
+      "url": "https://taxcomppro.com/api/mcp/admin",
+      "headers": {
+        "Authorization": "Bearer tetralioncapital@gmail.com"
       }
     }
   }
 }
-
