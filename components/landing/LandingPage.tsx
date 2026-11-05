@@ -404,17 +404,19 @@ export default function LandingPage() {
                 <span className="text-[#ffbe24]">Directly to Your Practice.</span>
               </h2>
               <p className="text-base sm:text-lg text-slate-300 leading-relaxed mb-6">
-                TaxComPro is the first professional tax ecosystem with native Model Context Protocol (MCP) support. Connect Claude Desktop, Cursor, ChatGPT, or Windsurf directly to your practice defense toolkits, courses, staff licenses, and digital cards with 48 automated tools.
+                TaxComPro is the first professional tax ecosystem with native Model Context Protocol (MCP) support. Connect Claude Desktop, Cursor, ChatGPT, or Windsurf directly to your community feed, practice defense toolkits, courses, staff licenses, and digital cards with 54 automated tools.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 text-left">
                 {[
+                  "Draft & Post to Community Feed from any LLM",
                   "Automated IRS Form 8867 Due Diligence",
                   "Instant Schedule C Reconstruction Ledgers",
                   "Staff Training Seat Provisioning & Audits",
                   "Real-time ProConnect Tap Card Analytics",
                   "Course Progress & Quiz Completion",
                   "Direct Practice Defense Toolkit Downloads",
+                  "Browse & Comment on Practitioner Threads",
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-2.5 text-sm font-semibold text-slate-200">
                     <CheckCircle2 className="w-4 h-4 text-[#ffbe24] shrink-0" />

@@ -21,6 +21,22 @@ export const userPromptDefinitions = [
       },
     ],
   },
+  {
+    name: "draft_community_feed_post",
+    description: "Draft a high-impact, professional tax practice post to publish directly to the TaxComPro community feed using the post_to_feed tool.",
+    arguments: [
+      {
+        name: "topic",
+        description: "The subject or insight (e.g., 'IRS 1099-K updates', 'Client audit win on Schedule C', 'Form 8867 due diligence tips')",
+        required: true,
+      },
+      {
+        name: "post_type",
+        description: "Type of post: 'technical_insight', 'practice_tip', 'client_victory', 'irs_alert', or 'discussion_starter'",
+        required: false,
+      },
+    ],
+  },
 ];
 
 export function handleUserGetPrompt(
@@ -67,6 +83,31 @@ Break down:
 2. Expense substantiation categories (auto, travel, home office, supplies, contractors).
 3. The reconstruction ledger formula.
 4. Client representation letter & disclosure statements.`,
+            },
+          },
+        ],
+      };
+    }
+
+    case "draft_community_feed_post": {
+      const topic = args?.topic || "Tax Practice Best Practices";
+      const postType = args?.post_type || "technical_insight";
+      return {
+        description: `Draft Community Feed Post for: ${topic}`,
+        messages: [
+          {
+            role: "user" as const,
+            content: {
+              type: "text" as const,
+              text: `You are a seasoned tax practitioner and active member of the TaxComPro professional community.
+Draft an engaging, authoritative, and helpful post about: "${topic}" (Format: ${postType}).
+
+Guidelines:
+1. Hook the reader with a practical reality tax practitioners face during filing or audit season.
+2. Deliver concrete, actionable tax insights (referencing IRC code, IRS publications, or practice standards where relevant).
+3. NEVER include real taxpayer PII (no SSNs, EINs, real client names, or bank numbers).
+4. End with an open, thought-provoking question to invite comments and peer discussion from other CPAs, EAs, and tax pros.
+5. Offer to call the \`post_to_feed\` tool to publish this post immediately to TaxComPro once approved.`,
             },
           },
         ],

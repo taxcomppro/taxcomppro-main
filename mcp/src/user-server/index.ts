@@ -17,6 +17,7 @@ import { networkToolDefinitions, handleNetworkTool } from "./tools/network";
 import { spaceToolDefinitions, handleSpaceTool } from "./tools/spaces";
 import { supportToolDefinitions, handleSupportTool } from "./tools/support";
 import { affiliateToolDefinitions, handleAffiliateTool } from "./tools/affiliate";
+import { feedToolDefinitions, handleFeedTool } from "./tools/feed";
 import { userResourceDefinitions, handleUserResourceRead } from "./resources/user-resources";
 import { userPromptDefinitions, handleUserGetPrompt } from "./prompts/user-prompts";
 
@@ -46,6 +47,7 @@ export function createUserMcpServer(user: UserSessionContext): Server {
     ...spaceToolDefinitions,
     ...supportToolDefinitions,
     ...affiliateToolDefinitions,
+    ...feedToolDefinitions,
   ];
 
   // Tool listing handler
@@ -85,6 +87,9 @@ export function createUserMcpServer(user: UserSessionContext): Server {
     }
     if (affiliateToolDefinitions.some((t) => t.name === name)) {
       return await handleAffiliateTool(name, args, user);
+    }
+    if (feedToolDefinitions.some((t) => t.name === name)) {
+      return await handleFeedTool(name, args, user);
     }
 
     throw new Error(`Tool not recognized by TaxComPro User MCP: ${name}`);

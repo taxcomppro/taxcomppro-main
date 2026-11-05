@@ -27,15 +27,16 @@ async function runTests() {
     // Use an internal call or check tool count
     console.log("\n[2/4] Testing User MCP Tools & Capabilities...");
     // Let's call a tool handler directly or check definition count
-    const { profileToolDefinitions } = await import("./src/user-server/tools/profile.js");
-    const { trainingToolDefinitions } = await import("./src/user-server/tools/training.js");
-    const { toolkitToolDefinitions } = await import("./src/user-server/tools/toolkits.js");
-    const { digitalCardToolDefinitions } = await import("./src/user-server/tools/digital-card.js");
-    const { marketplaceToolDefinitions } = await import("./src/user-server/tools/marketplace.js");
-    const { networkToolDefinitions } = await import("./src/user-server/tools/network.js");
-    const { spaceToolDefinitions } = await import("./src/user-server/tools/spaces.js");
-    const { supportToolDefinitions } = await import("./src/user-server/tools/support.js");
-    const { affiliateToolDefinitions } = await import("./src/user-server/tools/affiliate.js");
+    const { profileToolDefinitions } = await import("./src/user-server/tools/profile");
+    const { trainingToolDefinitions } = await import("./src/user-server/tools/training");
+    const { toolkitToolDefinitions } = await import("./src/user-server/tools/toolkits");
+    const { digitalCardToolDefinitions } = await import("./src/user-server/tools/digital-card");
+    const { marketplaceToolDefinitions } = await import("./src/user-server/tools/marketplace");
+    const { networkToolDefinitions } = await import("./src/user-server/tools/network");
+    const { spaceToolDefinitions } = await import("./src/user-server/tools/spaces");
+    const { supportToolDefinitions } = await import("./src/user-server/tools/support");
+    const { affiliateToolDefinitions } = await import("./src/user-server/tools/affiliate");
+    const { feedToolDefinitions, handleFeedTool } = await import("./src/user-server/tools/feed");
 
     const totalUserTools =
       profileToolDefinitions.length +
@@ -46,20 +47,26 @@ async function runTests() {
       networkToolDefinitions.length +
       spaceToolDefinitions.length +
       supportToolDefinitions.length +
-      affiliateToolDefinitions.length;
+      affiliateToolDefinitions.length +
+      feedToolDefinitions.length;
 
     console.log(`✓ Total User Tools Registered: ${totalUserTools}`);
+    console.log(`  - Feed & Community Tools (${feedToolDefinitions.length}): ${feedToolDefinitions.map(t => t.name).join(", ")}`);
     console.log(`  - Profile Tools (${profileToolDefinitions.length}): ${profileToolDefinitions.map(t => t.name).join(", ")}`);
     console.log(`  - Training Tools (${trainingToolDefinitions.length}): ${trainingToolDefinitions.map(t => t.name).join(", ")}`);
     console.log(`  - Toolkit Tools (${toolkitToolDefinitions.length}): ${toolkitToolDefinitions.map(t => t.name).join(", ")}`);
     console.log(`  - Digital Card Tools (${digitalCardToolDefinitions.length}): ${digitalCardToolDefinitions.map(t => t.name).join(", ")}`);
     console.log(`  - Marketplace Tools (${marketplaceToolDefinitions.length}): ${marketplaceToolDefinitions.map(t => t.name).join(", ")}`);
 
-    // Call a sample User Tool (get_my_profile)
-    const { handleProfileTool } = await import("./src/user-server/tools/profile.js");
+    // Call sample User Tools (get_my_profile & get_feed)
+    const { handleProfileTool } = await import("./src/user-server/tools/profile");
     const profileRes = await handleProfileTool("get_my_profile", {}, user);
     console.log("✓ Executed 'get_my_profile' tool successfully:");
     console.log("  Output preview:", profileRes.content[0].text.substring(0, 180) + "...");
+
+    const feedRes = await handleFeedTool("get_feed", { limit: 3 }, user);
+    console.log("✓ Executed 'get_feed' tool successfully:");
+    console.log("  Feed preview:", feedRes.content[0].text.substring(0, 180) + "...");
 
     // 2. Test Admin Context & Server
     console.log("\n[3/4] Resolving Admin Context...");
@@ -70,18 +77,18 @@ async function runTests() {
     console.log("✓ Admin MCP Server instance created.");
 
     console.log("\n[4/4] Testing Admin MCP Tools & Capabilities...");
-    const { adminAnalyticsToolDefinitions, handleAdminAnalyticsTool } = await import("./src/admin-server/tools/analytics.js");
-    const { adminUserToolDefinitions } = await import("./src/admin-server/tools/users.js");
-    const { adminProvisioningToolDefinitions } = await import("./src/admin-server/tools/provisioning.js");
-    const { adminModerationToolDefinitions } = await import("./src/admin-server/tools/moderation.js");
-    const { adminCouponToolDefinitions } = await import("./src/admin-server/tools/coupons.js");
-    const { adminCourseToolDefinitions } = await import("./src/admin-server/tools/courses.js");
-    const { adminSpaceToolDefinitions } = await import("./src/admin-server/tools/spaces.js");
-    const { adminAffiliateToolDefinitions } = await import("./src/admin-server/tools/affiliate.js");
-    const { adminProHubToolDefinitions } = await import("./src/admin-server/tools/pro-hub.js");
-    const { adminAtlasToolDefinitions } = await import("./src/admin-server/tools/atlas.js");
-    const { adminCommunicationsToolDefinitions } = await import("./src/admin-server/tools/communications.js");
-    const { adminNfcToolDefinitions } = await import("./src/admin-server/tools/nfc.js");
+    const { adminAnalyticsToolDefinitions, handleAdminAnalyticsTool } = await import("./src/admin-server/tools/analytics");
+    const { adminUserToolDefinitions } = await import("./src/admin-server/tools/users");
+    const { adminProvisioningToolDefinitions } = await import("./src/admin-server/tools/provisioning");
+    const { adminModerationToolDefinitions } = await import("./src/admin-server/tools/moderation");
+    const { adminCouponToolDefinitions } = await import("./src/admin-server/tools/coupons");
+    const { adminCourseToolDefinitions } = await import("./src/admin-server/tools/courses");
+    const { adminSpaceToolDefinitions } = await import("./src/admin-server/tools/spaces");
+    const { adminAffiliateToolDefinitions } = await import("./src/admin-server/tools/affiliate");
+    const { adminProHubToolDefinitions } = await import("./src/admin-server/tools/pro-hub");
+    const { adminAtlasToolDefinitions } = await import("./src/admin-server/tools/atlas");
+    const { adminCommunicationsToolDefinitions } = await import("./src/admin-server/tools/communications");
+    const { adminNfcToolDefinitions } = await import("./src/admin-server/tools/nfc");
 
     const totalAdminTools =
       adminAnalyticsToolDefinitions.length +

@@ -25,6 +25,8 @@ import {
   Cpu,
   Layers,
   ArrowRight,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 
@@ -40,6 +42,43 @@ interface ToolCategory {
 }
 
 const TOOL_CATEGORIES: ToolCategory[] = [
+  {
+    title: "Community Feed & Publishing",
+    icon: MessageSquare,
+    badge: "Social & Feed",
+    tools: [
+      {
+        name: "post_to_feed",
+        description: "Draft and publish technical tax insights, client victory stories, tips, or announcements to the community feed",
+        examplePrompt: "Post an insight about the new IRS Form 1099-K reporting rules to the community feed.",
+      },
+      {
+        name: "get_feed",
+        description: "Browse recent posts and discussions shared across the practitioner community feed",
+        examplePrompt: "Show me the top recent posts on the TaxComPro community feed.",
+      },
+      {
+        name: "get_my_posts",
+        description: "View your published and scheduled posts with like and comment metrics",
+        examplePrompt: "List all my feed posts and their engagement numbers.",
+      },
+      {
+        name: "comment_on_post",
+        description: "Reply or provide technical tax feedback on a peer's feed post",
+        examplePrompt: "Comment on post #cmtk123 with advice on Schedule C automobile mileage logs.",
+      },
+      {
+        name: "like_post",
+        description: "React to or like an insightful practitioner post",
+        examplePrompt: "Like post #cmtk123 with an 'INSIGHTFUL' reaction.",
+      },
+      {
+        name: "delete_my_post",
+        description: "Delete a post created by the authenticated user from the feed",
+        examplePrompt: "Delete my previous draft post from the feed.",
+      },
+    ],
+  },
   {
     title: "Practice Defense Toolkits & Staff",
     icon: Shield,
